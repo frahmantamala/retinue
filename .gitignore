@@ -16,3 +16,6 @@ sessions/
 history.jsonl
 *.local.md
 .DS_Store
+
+# Internal working docs — lane briefs, scratch design
+_design/
