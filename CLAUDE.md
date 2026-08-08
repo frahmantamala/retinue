@@ -164,8 +164,8 @@ Or explicitly: `"Switch to SWE mode"`, `"Switch to Frontend mode"`, etc.
 - SWE mode -> `.claude/agents/swe-mode.md`
 - Frontend mode -> `.claude/agents/frontend-mode.md`
 - PM mode -> `.claude/agents/pm-mode.md`
-- Designer mode -> `.claude/agents/designer-qa-mode.md` (Designer section)
-- QA mode -> `.claude/agents/designer-qa-mode.md` (QA section)
+- Designer mode -> `.claude/agents/designer-mode.md`
+- QA mode -> `.claude/agents/qa-mode.md`
 
 ### Loading Patterns
 
@@ -202,7 +202,8 @@ Create additional pattern files as needed (e.g. `react-patterns.md`, `node-patte
 │   ├── swe-mode.md                  # Backend principles
 │   ├── frontend-mode.md             # Frontend principles
 │   ├── pm-mode.md                   # PM mode
-│   ├── designer-qa-mode.md          # Designer & QA modes
+│   ├── designer-mode.md             # Designer / UI-UX mode
+│   ├── qa-mode.md                   # QA mode
 │   └── patterns/
 │       ├── go-patterns.md           # Go code patterns
 │       └── vue-patterns.md          # Vue/Nuxt code patterns
