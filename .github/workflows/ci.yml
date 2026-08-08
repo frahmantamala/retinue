@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt -w these files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - run: go build ./...
+      - run: go vet ./...
+      # -race because the tailer writes the graph while HTTP handlers read it.
+      - run: go test -race ./...
+
+  page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The page is go:embed'ed, so a syntax error in it ships silently — the Go
+      # build cannot see inside the file.
+      - name: page script parses
+        run: |
+          python3 - <<'PY' > /tmp/page.js
+          import re, sys
+          src = open('internal/watch/web/index.html').read()
+          m = re.search(r'<script>(.*)</script>', src, re.S)
+          if not m:
+              sys.exit('no inline script found in the page')
+          print(m.group(1))
+          PY
+          node --check /tmp/page.js
+
+      - name: page stays self-contained
+        run: |
+          if grep -nEi 'src=|href=|https?://' internal/watch/web/index.html; then
+            echo "the monitor page must not reference anything external — inline it"
+            exit 1
+          fi
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck --severity=warning scripts/*.sh
