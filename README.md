@@ -168,7 +168,7 @@ wiki/                  the knowledge-base schema (pages gitignored — see wiki/
 cmd/retinue/           the CLI — today, `retinue watch`
 internal/watch/        the monitor: tailer, graph model, SSE hub, single-file UI
 scripts/               shell stopgaps for what the monitor does not cover yet
-settings.example.json  permissions, deny list, destructive-SQL hook
+settings.example.json  deny list, destructive-SQL hook, auto mode — deliberately small
 install.sh             symlinks it all into ~/.claude, backing up what's there
 ```
 
@@ -190,6 +190,15 @@ whole setup. Existing files are backed up to `/tmp/claude-bak/` first.
 any agent or skill you keep locally but don't publish survives an install. `settings.json` is
 deliberately not linked at all — it holds machine-specific state and would fight you across two
 machines.
+
+`settings.example.json` is deliberately small. Auto mode classifies each command as it arrives, so a
+long `allow` list stops being a correctness requirement and becomes a per-machine, per-stack
+preference — a page of Bash rules tuned for Go and Postgres is noise in a Python repo. What remains
+is what no mode covers: `deny` rules, which win from any source in every mode including auto, and
+the `PreToolUse` hook, which runs regardless. Add your own `allow` entries if you want to skip the
+classifier on your hottest commands; that is a latency choice, not a safety one. Note that plan mode
+is not a permission mechanism at all — it withholds edits until you approve a plan, and grants
+nothing.
 
 For agent teams: `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and
 `export CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`. The crew runs on Opus — capable enough that a

@@ -63,3 +63,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: shellcheck --severity=warning scripts/*.sh
+
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # A malformed settings file silently disables every setting in it, so the
+      # example people copy from has to parse.
+      - run: jq empty settings.example.json
