@@ -58,13 +58,15 @@ When writing code, comments must be **sparse and meaningful**:
 
 ## DURABLE CONTEXT — THE WIKI (ALL MODES)
 
-`~/work/wiki` is the compiled knowledge base: domain and business knowledge, and the decisions
-behind it. Unlike this file and the auto-memory, it does NOT load itself — so reach for it.
+The wiki is the compiled knowledge base: domain and business knowledge, and the decisions behind it.
+Unlike this file and the auto-memory, it does NOT load itself — so reach for it.
+
+**It lives at `$RETINUE_WIKI`, defaulting to `~/work/wiki`.** Everything below, every skill, and
+`install.sh` read that one variable; resolve it before touching a path. Referred to as `$WIKI` here.
 
 **Read it when** the task touches a domain the wiki covers, when you are about to make an
-architectural or pricing call, or when starting an agent-team run. Entry point is
-`~/work/wiki/index.md` — cheap to read. Take page frontmatter and summaries first, page bodies
-second, `raw/` last.
+architectural or pricing call, or when starting an agent-team run. Entry point is `$WIKI/index.md` —
+cheap to read. Take page frontmatter and summaries first, page bodies second, `raw/` last.
 
 **Write to it when** a session produces knowledge that outlives it: a decision and its rationale, a
 domain fact learned the hard way, a constraint that will bind future work. Use `/capture`. Do not

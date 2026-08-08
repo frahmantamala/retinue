@@ -52,7 +52,7 @@ flags:
   --repo <path>    repository whose sessions to look in (default: .)
   --port <n>       localhost port (default: 7777)
   --interval <d>   poll interval (default: 500ms)
-  --wiki <path>    knowledge base root (default: ~/work/wiki)
+  --wiki <path>    knowledge base root (default: $RETINUE_WIKI, else ~/work/wiki)
   --budget-usd <n> spend ceiling to project against (default: none)
 `)
 }
@@ -63,7 +63,7 @@ func runWatch(args []string) error {
 	repo := fs.String("repo", ".", "repository whose sessions to look in")
 	port := fs.Int("port", 7777, "localhost port")
 	interval := fs.Duration("interval", 500*time.Millisecond, "poll interval")
-	wiki := fs.String("wiki", "", "knowledge base root (default: ~/work/wiki)")
+	wiki := fs.String("wiki", "", "knowledge base root (default: $RETINUE_WIKI, else ~/work/wiki)")
 	budget := fs.Float64("budget-usd", 0, "spend ceiling to project against (0: no ceiling)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -72,6 +72,11 @@ func runWatch(args []string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
+	}
+	// Flag wins, then the environment, then the convention. install.sh and the
+	// skills read the same variable, so one export moves every one of them.
+	if *wiki == "" {
+		*wiki = os.Getenv("RETINUE_WIKI")
 	}
 	if *wiki == "" {
 		*wiki = filepath.Join(home, "work", "wiki")

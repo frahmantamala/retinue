@@ -1,11 +1,12 @@
 ---
 name: capture
-description: Capture knowledge from the current session into the LLM wiki at ~/work/wiki — decisions and their rationale, domain facts, constraints that will bind future work. Use at the end of a session that decided something, after an agent-team run, or when the user says "capture this", "save this to the wiki", or "remember why we did this".
+description: Capture knowledge from the current session into the LLM wiki — decisions and their rationale, domain facts, constraints that will bind future work. Use at the end of a session that decided something, after an agent-team run, or when the user says "capture this", "save this to the wiki", or "remember why we did this".
 ---
 
 # Capture
 
-Drain what this session learned into `~/work/wiki`. Works from any repo — the wiki is global.
+Drain what this session learned into the wiki at `$RETINUE_WIKI` (default `~/work/wiki`), called
+`$WIKI` below. Works from any repo — the wiki is global.
 
 The wiki decays from neglect, not from bad structure. Most knowledge is lost because nobody
 switched repos to run `/ingest`. This skill removes that step.
@@ -36,9 +37,9 @@ correct outcome; padding the wiki is worse than leaving it alone.
 
 ## Steps
 
-1. **Read the schema.** `~/work/wiki/CLAUDE.md` governs page types, frontmatter, named edges, and
+1. **Read the schema.** `$WIKI/CLAUDE.md` governs page types, frontmatter, named edges, and
    supersession. Follow it exactly — this skill does not restate it.
-2. **Read `~/work/wiki/index.md`** to see what already exists. You are usually updating a page, not
+2. **Read `$WIKI/index.md`** to see what already exists. You are usually updating a page, not
    creating one.
 3. **Identify the candidates** from this session. Name them to the user in one line each before writing.
 4. **For each: merge or create.**

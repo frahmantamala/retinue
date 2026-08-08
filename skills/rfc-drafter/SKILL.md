@@ -20,7 +20,7 @@ If the user wants implementation, they want a different mode — say so and stop
 2. Read the most recent RFC in `_design/` — match its depth and tone, not just
    its headings.
 3. Read `_design/index.md` if present; you will add an entry to it.
-4. Check `~/work/wiki/` for relevant `decisions/` and `entities/` — an RFC that
+4. Check the wiki (`$RETINUE_WIKI`, default `~/work/wiki`) for relevant `decisions/` and `entities/` — an RFC that
    contradicts a recorded decision must say so explicitly.
 
 ## Interview first

@@ -19,7 +19,7 @@ You are the **lead** of the retinue. Run the full contract in `~/.claude/TEAM-PL
 
 1. **Load context — repo and wiki.**
    - Read the repo's `CLAUDE.md` (root + `backend/`/`frontend/` subdirs). If the repo has NO `CLAUDE.md`, warn the user — teammates will infer the architecture and may break conventions. Offer to generate one first. Inject the architecture summary (modular monolith layering, feature-folder boundaries, invariants) into every teammate's brief so they don't diverge.
-   - Read `~/work/wiki/index.md` and pull any decisions touching this repo or this problem. These are settled; teammates must not re-litigate them.
+   - Read `$RETINUE_WIKI/index.md` (default `~/work/wiki`) and pull any decisions touching this repo or this problem. These are settled; teammates must not re-litigate them.
 2. **Clarify the feature — once.** If the scope is genuinely ambiguous (different readings produce materially different builds), ask now, in one round. Otherwise state your assumptions in the brief and proceed. Do not stall on questions you can answer from the repo.
 3. **Decompose into lanes** — one teammate per independent stream, plus a Review lane. Map each to concrete files/modules. Typical split:
    - Backend — routes/handlers/migrations
@@ -31,7 +31,7 @@ You are the **lead** of the retinue. Run the full contract in `~/.claude/TEAM-PL
 6. **Spawn and supervise.** Poll progress. Re-brief or reassign agents that stall, wander out of lane, or diverge from the contract. Write no source code yourself — assign remaining gaps to an agent.
 7. **Verify yourself.** Run the build, the tests, the endpoint. A teammate's success report is a claim, not evidence.
 8. **Gate.** Merge a stream only on green build AND Review approval. On failure, assign a specific fix and loop back to step 6 — **max two cycles per finding**, then escalate.
-9. **Capture.** Write decisions made during the run to `~/work/wiki/decisions/YYYY-MM-DD-slug.md` with `supersedes::[[...]]` edges where you overrode an earlier call, and add the page to `index.md`. Skip only if the run made no decision worth inheriting.
+9. **Capture.** Write decisions made during the run to `$RETINUE_WIKI/decisions/YYYY-MM-DD-slug.md` with `supersedes::[[...]]` edges where you overrode an earlier call, and add the page to `index.md`. Skip only if the run made no decision worth inheriting.
 10. **Report once**, at the end.
 
 ## Escalation

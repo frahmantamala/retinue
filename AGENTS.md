@@ -28,7 +28,7 @@ All three are plain markdown. Nothing here needs a runtime, an index, or a vecto
 
 ## Durable context
 
-A compiled wiki (default `~/work/wiki`) holds decisions and domain knowledge that outlive a session.
+A compiled wiki (`$RETINUE_WIKI`, default `~/work/wiki`) holds decisions and domain knowledge that outlive a session.
 Read it at the start of a run so settled decisions are not re-litigated; write back what the run
 decided, with `supersedes::[[old-page]]` edges where it overrode an earlier call. `wiki/CLAUDE.md`
 is the schema. Nothing here is Claude-specific — it is markdown and `rg`.

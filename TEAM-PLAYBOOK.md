@@ -146,12 +146,12 @@ files for hours with nothing prompting. Unattended runs also require `--max-budg
 
 ### Wiki bookends
 
-The run starts and ends in `~/work/wiki` — that is what makes the next run cheaper than this one.
+The run starts and ends in the wiki (`$RETINUE_WIKI`, default `~/work/wiki`) — that is what makes the next run cheaper than this one.
 
 - **At start:** read `wiki/index.md`, pull decisions touching this repo, and put them in every
   teammate brief. Teammates must not re-litigate settled decisions.
 - **At end:** write what was decided to `wiki/decisions/YYYY-MM-DD-slug.md` with
-  `supersedes::[[...]]` edges where this run overrode an earlier call. See `~/work/wiki/CLAUDE.md`.
+  `supersedes::[[...]]` edges where this run overrode an earlier call. See the schema at `$RETINUE_WIKI/CLAUDE.md`.
 
 ## Cost & safety knobs
 

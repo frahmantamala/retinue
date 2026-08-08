@@ -11,7 +11,7 @@ equally unsuited to a public repo. The schema is the part worth sharing.
 ## Starting your own
 
 ```bash
-mkdir -p ~/work/wiki/{concepts,entities,decisions,raw}
+mkdir -p "${RETINUE_WIKI:-$HOME/work/wiki}"/{concepts,entities,decisions,raw}
 cd ~/work/retinue && ./install.sh      # links CLAUDE.md + commands into it
 ```
 
