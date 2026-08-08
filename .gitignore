@@ -19,3 +19,6 @@ history.jsonl
 
 # Internal working docs — lane briefs, scratch design
 _design/
+
+# Built binary — `go build ./cmd/retinue` drops it here
+/retinue

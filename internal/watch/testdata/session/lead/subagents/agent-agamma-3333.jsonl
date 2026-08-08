@@ -1,0 +1,2 @@
+{"type":"user","uuid":"r1","agentId":"agamma-3333","isSidechain":true,"sessionId":"sess","timestamp":"2026-08-08T16:40:21.000Z","message":{"content":"Map the components."}}
+{"type":"assistant","uuid":"r2","agentId":"agamma-3333","isSidechain":true,"sessionId":"sess","timestamp":"2026-08-08T16:40:22.000Z","message":{"content":[{"type":"tool_use","id":"toolu_grep1","name":"Grep","input":{"pattern":"export function"}}],"usage":{"input_tokens":1,"output_tokens":25,"cache_creation_input_tokens":600}}}

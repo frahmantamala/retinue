@@ -79,6 +79,29 @@ one to believe — and gives the edge a direction it never had. Nothing is ever 
 the superseded page stays, annotated. A knowledge base that never records where it changed its mind
 decays into confident averages.
 
+## Watching a run
+
+A team run is opaque while it happens: three agents editing files in parallel, and a lead that
+reports once, at the end. `retinue watch` renders it as it goes.
+
+```bash
+go run ./cmd/retinue watch                        # newest session in this repo
+go run ./cmd/retinue watch --repo ~/work/app --port 7777
+```
+
+It follows the session transcript and every teammate transcript beneath it, and serves a graph on
+localhost — lead in marigold, crew in white, radius by tokens spent, a dot crossing the edge each
+time an agent produces a message. Spawn edges come from the `Agent` tool call, report edges from its
+matching result, so a lane that never came back stays visibly open instead of quietly looking done.
+
+Teammates do **not** appear as `isSidechain` events in the lead transcript, which is the intuitive
+guess and the wrong one; each gets its own file under `<session-id>/subagents/`, with a sidecar
+holding the only copy of its human name. Both halves of a spawn and both halves of a report can
+arrive in either order, so every correlation is stored from both sides.
+
+Read-only, localhost-only, no auth. Transcripts hold full prompts and tool output; this server has
+no business being reachable off the machine.
+
 ## Layout
 
 ```
@@ -89,6 +112,9 @@ agents/                9 subagent personas — 5 modes + review/test/docs/PR
 skills/                /run-team, /capture, /new-app, /rfc-drafter, /review-diff
 templates/             per-project CLAUDE.md template
 wiki/                  the knowledge-base schema (pages gitignored — see wiki/README.md)
+cmd/retinue/           the CLI — today, `retinue watch`
+internal/watch/        the monitor: tailer, graph model, SSE hub, single-file UI
+scripts/               shell stopgaps for what the monitor does not cover yet
 settings.example.json  permissions, deny list, destructive-SQL hook
 install.sh             symlinks it all into ~/.claude, backing up what's there
 ```

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Stopgap agent-activity tail. Run in a second terminal while a team is working.
+# Plain-text agent-activity tail. Run in a second terminal while a team is working.
 #
-# This is NOT the monitor — `retinue watch` (see _design/MONITOR-LANES.md) replaces it with a
-# real graph. This exists so there is something to watch during the run that builds that.
+# `retinue watch` is the graph view and the better default; this stays for the cases a canvas is
+# worse than a log — piping into grep, a machine with no browser, or reading the actual tool calls
+# in order.
 #
 #   scripts/watch-events.sh                    # newest session in the current repo
 #   scripts/watch-events.sh ~/work/klinesa     # newest session in another repo
