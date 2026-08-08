@@ -3,7 +3,8 @@
 ## CRITICAL SAFETY RULES
 
 **Require explicit approval (the harness also enforces some of these):**
-- `git push` / force push - ALWAYS wait for review (denied in settings)
+- `git push` - only when I ask for it, never as a follow-on to a commit (prompts, not denied)
+- Force push (`-f`, `--force`, `--force-with-lease`) - denied in settings
 - `DROP DATABASE` / `DROP TABLE` / `TRUNCATE` - ASK FIRST (a PreToolUse hook forces a prompt; never run without confirmation)
 - `DELETE FROM` without WHERE - ASK FIRST
 - Destructive migrations - PROPOSE FIRST
@@ -249,4 +250,4 @@ When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lea
 **Cost & safety.**
 - Teammates run on Opus (`CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`); the lead stays on the session model. Cap every unattended run — Opus lanes are not cheap.
 - Autonomous/headless runs must be capped: `--max-budget-usd N`.
-- The `permissions` deny list in settings.json is authoritative — never work around `git push`, `rm -rf`, `sudo`, or `publish` denials.
+- The `permissions` deny list in settings.json is authoritative — never work around `git push --force`, `sudo`, or `publish` denials.
