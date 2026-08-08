@@ -53,15 +53,25 @@ correct outcome; padding the wiki is worse than leaving it alone.
    another project, another domain. The graph's weakness is that its clusters barely connect;
    a cross-cluster edge is worth more than a third link inside a cluster you were already in.
 7. **Update `index.md` and `CHANGELOG.md`** — one terse line each, dated.
+8. **Commit and push the wiki.** A capture that stays in the working tree is not captured — it is one
+   `rm -rf` from never having happened. Commit what you wrote, then push.
+   - No remote configured → commit anyway and **say so plainly**. Do not create a remote; where this
+     knowledge is allowed to live is the user's call, not a default. A wiki holding client or
+     employer material needs a *private* remote, and picking one is a decision, not a step.
+   - Push rejected or denied → report it and stop. Never force-push a knowledge base; a rejected push
+     means someone else's writing is on the remote, and the merge is worth doing properly.
+   - Nothing was worth capturing → nothing to commit. Say that instead.
 
 ## Conventions
 
 - Convert relative dates to absolute (`today` → the real date).
 - Sparse, meaningful prose. One idea per page; split a page that grew two topics.
 - Indonesian copy stays direct and practical — no pribahasa, no flowery framing.
-- Do not commit unless the user asks.
+- Commit and push the wiki as part of the capture (step 8). Do not commit anything *else* — the repo
+  you were working in is not part of this.
 
 ## Output
 
 One line per page created or updated, and one line naming anything you deliberately did not
-capture and why.
+capture and why. Close with where the commit landed — pushed, or committed with the reason it
+could not be pushed.
