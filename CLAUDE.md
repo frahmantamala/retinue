@@ -247,6 +247,6 @@ When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lea
 - The lead merges a stream only after Review approves it.
 
 **Cost & safety.**
-- Teammates run on Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`); the lead stays on the session model.
+- Teammates run on Opus (`CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`); the lead stays on the session model. Cap every unattended run — Opus lanes are not cheap.
 - Autonomous/headless runs must be capped: `--max-budget-usd N`.
 - The `permissions` deny list in settings.json is authoritative — never work around `git push`, `rm -rf`, `sudo`, or `publish` denials.

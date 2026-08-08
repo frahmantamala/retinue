@@ -1,7 +1,7 @@
 ---
 name: pr-writer
 description: Drafts a clear PR title and description from the current branch's diff. Read-only on git — does not push or create the PR unless explicitly told.
-model: sonnet
+model: opus
 tools: Read, Grep, Glob, Bash
 ---
 

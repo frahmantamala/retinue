@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Reviews code produced by other agents or in the current diff for bugs, security issues, and style. Read-only — reports findings, never edits.
-model: sonnet
+model: opus
 tools: Read, Grep, Glob, Bash
 ---
 

@@ -10,7 +10,7 @@ Set up and drive a Level 3 agent team (lead coordinates teammates over a shared 
 ## Preconditions
 
 1. Confirm `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set (`echo $CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). If empty, tell the user to `source ~/.zshrc` or open a new shell — do not proceed without it.
-2. Confirm teammates are routed to Sonnet (`echo $CLAUDE_CODE_SUBAGENT_MODEL`).
+2. Confirm teammates are routed to an Opus model (`echo $CLAUDE_CODE_SUBAGENT_MODEL` — expect `claude-opus-*`). If it names an older Opus than the current one, say so once and carry on.
 
 ## Steps
 

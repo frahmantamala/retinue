@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: Writes and runs tests for code another agent produced. Owns test files only — does not modify source.
-model: sonnet
+model: opus
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 

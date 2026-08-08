@@ -122,7 +122,7 @@ The run starts and ends in `~/work/wiki` — that is what makes the next run che
 
 ## Cost & safety knobs
 
-- Teammates auto-route to Sonnet via `CLAUDE_CODE_SUBAGENT_MODEL="claude-sonnet-5"`; lead stays on your session model (Opus).
+- Teammates run on Opus via `CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`; lead stays on your session model. Capable crew, but every lane now costs lead-tier money — the budget cap below stops being optional.
 - Always cap autonomous runs: `--max-budget-usd 15.00`.
 - Guardrails live in `~/.claude/settings.json` → `permissions` (deny `git push`, `sudo`, `publish`, reading secrets). Deny always beats allow. Note: `rm` is NOT denied — the backup-before-`rm` rule in CLAUDE.md is honor-system, not enforced.
 

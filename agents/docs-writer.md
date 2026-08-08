@@ -1,7 +1,7 @@
 ---
 name: docs-writer
 description: Updates documentation (.md files) to reflect code changes. Owns docs only — never touches source code.
-model: sonnet
+model: opus
 tools: Read, Write, Edit, Glob, Grep
 ---
 

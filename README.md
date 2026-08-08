@@ -113,8 +113,9 @@ deliberately not linked at all — it holds machine-specific state and would fig
 machines.
 
 For agent teams: `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and
-`export CLAUDE_CODE_SUBAGENT_MODEL="claude-sonnet-5"` — the crew runs on Sonnet, the lead stays on
-your session model. Cap unattended runs with `--max-budget-usd`.
+`export CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`. The crew runs on Opus — capable enough that a
+lane's output usually survives review, at the cost of every lane billing at lead tier. Cap unattended
+runs with `--max-budget-usd`; with an Opus crew that is a requirement, not a suggestion.
 
 ## What is deliberately not here
 
