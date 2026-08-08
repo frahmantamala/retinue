@@ -43,16 +43,26 @@ type contentBlock struct {
 	Name      string          `json:"name"`
 	ID        string          `json:"id"`
 	ToolUseID string          `json:"tool_use_id"`
+	Text      string          `json:"text"`
 	Input     json.RawMessage `json:"input"`
 }
 
-type spawnInput struct {
+// toolInput is the union of the input fields worth surfacing. Every tool has
+// its own schema; these are the ones that answer "what is it doing right now".
+type toolInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	FilePath    string `json:"file_path"`
+	Path        string `json:"path"`
+	Pattern     string `json:"pattern"`
+	Command     string `json:"command"`
+	Query       string `json:"query"`
+	URL         string `json:"url"`
+	Prompt      string `json:"prompt"`
 }
 
-func (b contentBlock) spawn() spawnInput {
-	var in spawnInput
+func (b contentBlock) input() toolInput {
+	var in toolInput
 	if len(b.Input) > 0 {
 		_ = json.Unmarshal(b.Input, &in)
 	}

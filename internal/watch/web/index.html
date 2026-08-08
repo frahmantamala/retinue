@@ -11,7 +11,9 @@
     --marigold: #e0a63c;
     --muted: #6b6b64;
     --dim: #2a2a27;
+    --rail: 330px;
   }
+  @media (max-width: 860px) { :root { --rail: 0px; } #rail { display: none; } }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
@@ -34,19 +36,49 @@
   #status.live::before { content: "● "; color: #7fb069; }
   #status.down::before { content: "● "; color: #c1553f; }
   #empty {
-    position: fixed; inset: 0;
+    position: fixed; inset: 0 var(--rail) 0 0;
     display: grid; place-content: center; place-items: center; gap: 6px;
     color: var(--muted); text-align: center; pointer-events: none;
   }
   #empty.hidden { display: none; }
   #empty .big { color: var(--ink); letter-spacing: .04em; }
   footer {
-    position: fixed; bottom: 0; left: 0; right: 0;
+    position: fixed; bottom: 0; left: 0; right: var(--rail);
     display: flex; gap: 18px; padding: 14px 18px;
     color: var(--muted); pointer-events: none;
   }
   .key { display: inline-flex; align-items: center; gap: 6px; }
   .swatch { width: 9px; height: 9px; border-radius: 50%; }
+
+  #rail {
+    position: fixed; top: 0; right: 0; bottom: 0; width: var(--rail);
+    display: flex; flex-direction: column; min-height: 0;
+    padding-top: 44px;
+    border-left: 1px solid var(--dim);
+    background: rgba(14, 14, 13, .93);
+  }
+  #rail section { display: flex; flex-direction: column; min-height: 0; }
+  #rail section.grow { flex: 1; }
+  #rail h2 {
+    margin: 0; padding: 14px 16px 6px;
+    font-size: 10px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  #rail h2 span { color: var(--dim); }
+  #rail ul { list-style: none; margin: 0; padding: 0 16px 10px; overflow-y: auto; }
+  #knowledge { max-height: 32vh; }
+  #activity { flex: 1; }
+  #rail li { display: flex; gap: 8px; padding: 2px 0; align-items: baseline; }
+  #rail li.none { color: var(--dim); }
+  .at { color: var(--dim); flex: none; }
+  .who { flex: none; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who.lead { color: var(--marigold); }
+  .did { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .did b { color: rgba(242,240,234,.8); font-weight: 400; }
+  .page { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .via { flex: none; color: var(--dim); }
+  .via.brief { color: rgba(224,166,60,.7); }
+  .via.wrote { color: rgba(127,176,105,.8); }
 </style>
 </head>
 <body>
@@ -62,6 +94,17 @@
   <div class="big">waiting for events</div>
   <div id="emptyWhy">no agent activity on this session yet</div>
 </div>
+
+<aside id="rail">
+  <section>
+    <h2>knowledge <span id="knowledgeCount"></span></h2>
+    <ul id="knowledge"><li class="none">no wiki pages reached the crew yet</li></ul>
+  </section>
+  <section class="grow">
+    <h2>activity</h2>
+    <ul id="activity"><li class="none">nothing yet</li></ul>
+  </section>
+</aside>
 
 <footer>
   <span class="key"><span class="swatch" style="background:var(--marigold)"></span>lead</span>
@@ -81,11 +124,18 @@
   const emptyEl = document.getElementById("empty");
   const emptyWhy = document.getElementById("emptyWhy");
 
+  const railEl = document.getElementById("rail");
+  const activityEl = document.getElementById("activity");
+  const knowledgeEl = document.getElementById("knowledge");
+  const knowledgeCount = document.getElementById("knowledgeCount");
+
   const nodes = new Map();   // id -> node model
   const edges = new Map();   // key -> {from, to, rel}
   const pulses = [];         // {from, to, t0}
+  const pages = new Map();   // wiki page -> {via:Set, who:Set}
 
   const PULSE_MS = 900;
+  const ACTIVITY_ROWS = 80;
   let width = 0, height = 0, dpr = 1;
 
   function resize() {
@@ -119,7 +169,7 @@
       const radius = m.role === "lead" ? 0 : 120 + Math.random() * 90;
       n = {
         id: m.id,
-        x: width / 2 + Math.cos(angle) * radius,
+        x: (width - (railEl.offsetWidth || 0)) / 2 + Math.cos(angle) * radius,
         y: height / 2 + Math.sin(angle) * radius,
         vx: 0, vy: 0,
       };
@@ -138,10 +188,71 @@
     edges.set(`${m.from}|${m.to}|${m.rel}`, { from: m.from, to: m.to, rel: m.rel });
   }
 
+  function labelFor(id) {
+    const n = nodes.get(id);
+    return n ? n.label : id.slice(0, 12);
+  }
+
+  function clockOf(ts) {
+    if (!ts) return "--:--";
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  function pushActivity(m) {
+    const none = activityEl.querySelector(".none");
+    if (none) none.remove();
+
+    const li = document.createElement("li");
+    const isLead = nodes.get(m.id)?.role === "lead";
+    li.innerHTML =
+      `<span class="at">${clockOf(m.ts)}</span>` +
+      `<span class="who${isLead ? " lead" : ""}">${escapeHtml(labelFor(m.id))}</span>` +
+      `<span class="did"><b>${escapeHtml(m.tool)}</b> ${escapeHtml(m.detail || "")}</span>`;
+    li.title = `${labelFor(m.id)} · ${m.tool} ${m.detail || ""}`;
+
+    activityEl.prepend(li);
+    while (activityEl.children.length > ACTIVITY_ROWS) activityEl.lastElementChild.remove();
+  }
+
+  function addKnowledge(m) {
+    let e = pages.get(m.page);
+    if (!e) { e = { via: new Set(), who: new Set() }; pages.set(m.page, e); }
+    e.via.add(m.via);
+    e.who.add(m.id);
+    renderKnowledge();
+  }
+
+  function renderKnowledge() {
+    knowledgeCount.textContent = pages.size ? "· " + pages.size : "";
+    knowledgeEl.textContent = "";
+    if (!pages.size) {
+      const li = document.createElement("li");
+      li.className = "none";
+      li.textContent = "no wiki pages reached the crew yet";
+      knowledgeEl.append(li);
+      return;
+    }
+    for (const [page, e] of pages) {
+      // Ordered by how much each says about the run: "brief" means the lead put
+      // the page in front of an agent, "wrote" means the run fed the wiki back.
+      const via = e.via.has("brief") ? "brief" : e.via.has("wrote") ? "wrote" : "read";
+      const who = [...e.who].map(labelFor).join(", ");
+      const li = document.createElement("li");
+      li.innerHTML =
+        `<span class="page">${escapeHtml(page)}</span>` +
+        `<span class="via ${via}">${via} · ${e.who.size}</span>`;
+      li.title = `${page} — ${via}: ${who}`;
+      knowledgeEl.append(li);
+    }
+  }
+
   function handle(m) {
     if (m.kind === "node") upsertNode(m);
     else if (m.kind === "edge") addEdge(m);
     else if (m.kind === "pulse") pulses.push({ from: m.from, to: m.to, t0: performance.now() });
+    else if (m.kind === "activity") pushActivity(m);
+    else if (m.kind === "knowledge") addKnowledge(m);
     emptyEl.classList.toggle("hidden", nodes.size > 1 || edges.size > 0);
     if (nodes.size === 1) emptyWhy.textContent = "lead is running — no crew spawned yet";
   }
@@ -164,6 +275,8 @@
 
   function step() {
     const list = [...nodes.values()];
+    const rail = railEl.offsetWidth || 0;   // 0 once the rail is hidden on narrow screens
+    const cx = (width - rail) / 2;
     for (const n of list) {
       let fx = 0, fy = 0;
       for (const o of list) {
@@ -177,7 +290,7 @@
         fy += (dy / d) * f;
       }
       // The lead anchors the middle; everything else arranges around it.
-      const pullX = width / 2 - n.x, pullY = height / 2 - n.y;
+      const pullX = cx - n.x, pullY = height / 2 - n.y;
       const gravity = n.role === "lead" ? 0.06 : 0.008;
       fx += pullX * gravity;
       fy += pullY * gravity;
@@ -202,7 +315,7 @@
       n.x += n.vx;
       n.y += n.vy;
       const r = radiusOf(n) + 40;
-      n.x = Math.max(r, Math.min(width - r, n.x));
+      n.x = Math.max(r, Math.min(width - rail - r, n.x));
       n.y = Math.max(r + 30, Math.min(height - r - 30, n.y));
     }
   }

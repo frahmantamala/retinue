@@ -94,6 +94,22 @@ localhost — lead in marigold, crew in white, radius by tokens spent, a dot cro
 time an agent produces a message. Spawn edges come from the `Agent` tool call, report edges from its
 matching result, so a lane that never came back stays visibly open instead of quietly looking done.
 
+Alongside it, a rail carries the two things a graph cannot show: a rolling feed of what each agent
+is actually doing — `Bash · Run the suite`, `Read · concepts/tenancy.md` — and **where knowledge
+came from**.
+
+```
+read   concepts/agent-supervision-contract           lead
+brief  decisions/2026-07-18-monolith-first           lane1-be-iam
+wrote  decisions/2026-08-09-permission-gating        lead
+```
+
+`read` is an agent opening a page. `brief` is the lead citing one in the prompt it wrote for a
+teammate — by `[[wikilink]]` or by plain path. `wrote` is the run feeding the wiki back at the end.
+The distinction is the point: a run whose knowledge column is all `read` by the lead has a wiki that
+never reached the crew, which is the failure the memory half exists to prevent and the one you
+cannot see from a transcript. Point `--wiki` anywhere to track a different knowledge root.
+
 Teammates do **not** appear as `isSidechain` events in the lead transcript, which is the intuitive
 guess and the wrong one; each gets its own file under `<session-id>/subagents/`, with a sidecar
 holding the only copy of its human name. Both halves of a spawn and both halves of a report can

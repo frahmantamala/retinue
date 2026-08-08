@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -60,6 +61,7 @@ func runWatch(args []string) error {
 	repo := fs.String("repo", ".", "repository whose sessions to look in")
 	port := fs.Int("port", 7777, "localhost port")
 	interval := fs.Duration("interval", 500*time.Millisecond, "poll interval")
+	wiki := fs.String("wiki", "", "knowledge base root (default: ~/work/wiki)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -68,12 +70,15 @@ func runWatch(args []string) error {
 	if err != nil {
 		return err
 	}
+	if *wiki == "" {
+		*wiki = filepath.Join(home, "work", "wiki")
+	}
 	sess, err := watch.Discover(home, *repo, *session)
 	if err != nil {
 		return err
 	}
 
-	graph := watch.NewGraph()
+	graph := watch.NewGraph(*wiki, home)
 	hub := watch.NewHub()
 	watcher := watch.NewWatcher(sess, graph, hub, *interval, log.Printf)
 

@@ -18,9 +18,11 @@ func fixtureSession() Session {
 	}
 }
 
+const fixtureWiki = "/Users/demo/work/wiki"
+
 func runFixture(t *testing.T, passes int) (*Graph, *Watcher) {
 	t.Helper()
-	g := NewGraph()
+	g := NewGraph(fixtureWiki, "/Users/demo")
 	w := NewWatcher(fixtureSession(), g, NewHub(), time.Millisecond, nil)
 	w.start()
 	for range passes {
@@ -123,7 +125,7 @@ func TestMalformedLineSkippedAndParsingContinues(t *testing.T) {
 // attachment and system lines carry no activity; counting them would inflate
 // state churn and, worse, create phantom nodes.
 func TestUnknownEventTypesIgnored(t *testing.T) {
-	g := NewGraph()
+	g := NewGraph("", "")
 	g.EnsureLead("lead")
 	for _, line := range []string{
 		`{"type":"attachment","uuid":"x","timestamp":"2026-08-08T16:40:04.000Z"}`,
@@ -146,7 +148,7 @@ func TestUnknownEventTypesIgnored(t *testing.T) {
 // Files are tailed independently, so a completion can be read before the
 // teammate's own transcript is discovered.
 func TestReportBeforeRegister(t *testing.T) {
-	g := NewGraph()
+	g := NewGraph("", "")
 	g.EnsureLead("lead")
 
 	spawn := mustDecode(t, `{"type":"assistant","uuid":"a","timestamp":"2026-08-08T16:40:00.000Z","message":{"content":[{"type":"tool_use","id":"toolu_X","name":"Agent","input":{"name":"delta"}}]}}`)
@@ -174,7 +176,7 @@ func TestReportBeforeRegister(t *testing.T) {
 
 // A late line from a finished agent must not flip it back to running.
 func TestDoneIsSticky(t *testing.T) {
-	g := NewGraph()
+	g := NewGraph("", "")
 	g.EnsureLead("lead")
 	g.Apply(LeadNodeID, mustDecode(t, `{"type":"assistant","uuid":"a","message":{"content":[{"type":"tool_use","id":"toolu_X","name":"Agent","input":{"name":"delta"}}]}}`))
 	g.Register("adelta-9999", agentMeta{Name: "delta"})
@@ -250,6 +252,90 @@ func TestDiscoverPicksNewestSession(t *testing.T) {
 	}
 	if _, err := Discover(home, "/Users/x/work/absent", ""); err == nil {
 		t.Error("want an error for a repo with no transcripts")
+	}
+}
+
+func knowledgeOf(g *Graph) map[string]string {
+	out := map[string]string{}
+	for _, m := range g.Snapshot() {
+		if k, ok := m.(Knowledge); ok {
+			out[k.ID+"|"+k.Page] = k.Via
+		}
+	}
+	return out
+}
+
+func activityOf(g *Graph) []Activity {
+	var out []Activity
+	for _, m := range g.Snapshot() {
+		if a, ok := m.(Activity); ok {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// The wiki only pays off if it reaches the crew, so the monitor has to
+// distinguish a page the lead pasted into a brief from one an agent opened.
+func TestKnowledgeProvenance(t *testing.T) {
+	g, _ := runFixture(t, 1)
+	want := map[string]string{
+		"lead|decisions/2026-07-18-monolith-first":       ViaBrief,
+		"lead|concepts/tenancy":                          ViaBrief,
+		"aalpha-1111|concepts/tenancy":                   ViaRead,
+		"abeta-2222|decisions/2026-07-18-monolith-first": ViaRead,
+	}
+	got := knowledgeOf(g)
+	for k, via := range want {
+		if got[k] != via {
+			t.Errorf("%s: want via=%s, got %q", k, via, got[k])
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("want %d knowledge entries, got %d: %v", len(want), len(got), got)
+	}
+}
+
+func TestKnowledgeDedupedPerAgent(t *testing.T) {
+	g := NewGraph(fixtureWiki, "/Users/demo")
+	g.EnsureLead("lead")
+	line := `{"type":"assistant","uuid":"a","message":{"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/Users/demo/work/wiki/concepts/tenancy.md"}}]}}`
+	g.Apply(LeadNodeID, mustDecode(t, line))
+	g.Apply(LeadNodeID, mustDecode(t, line))
+
+	if got := knowledgeOf(g); len(got) != 1 {
+		t.Errorf("a page read twice is one fact, got %v", got)
+	}
+}
+
+func TestActivityFeed(t *testing.T) {
+	g, _ := runFixture(t, 1)
+	seen := map[string]bool{}
+	for _, a := range activityOf(g) {
+		seen[a.ID+"|"+a.Tool+"|"+a.Detail] = true
+	}
+	for _, want := range []string{
+		"lead|says|Decomposing into two lanes.",
+		"lead|Agent|Lane A parser",
+		"lead|Bash|Build the module",
+		"aalpha-1111|Read|concepts/tenancy.md",
+		"abeta-2222|Bash|Check the settled tenancy call",
+	} {
+		if !seen[want] {
+			t.Errorf("missing activity %q", want)
+		}
+	}
+}
+
+// A run producing thousands of lines must not hand every new client all of them.
+func TestActivityBounded(t *testing.T) {
+	g := NewGraph("", "")
+	g.EnsureLead("lead")
+	for range activityLimit + 50 {
+		g.Apply(LeadNodeID, mustDecode(t, `{"type":"assistant","uuid":"a","message":{"content":[{"type":"tool_use","id":"t","name":"Bash","input":{"description":"tick"}}]}}`))
+	}
+	if got := len(activityOf(g)); got != activityLimit {
+		t.Errorf("want activity capped at %d, got %d", activityLimit, got)
 	}
 }
 

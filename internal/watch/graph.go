@@ -28,7 +28,31 @@ type (
 		To   string `json:"to"`
 		TS   int64  `json:"ts"`
 	}
+
+	// Activity is one readable line of what an agent just did. Additive to the
+	// pinned contract: the three shapes above are unchanged.
+	Activity struct {
+		Kind   string `json:"kind"`
+		ID     string `json:"id"`
+		Tool   string `json:"tool"`
+		Detail string `json:"detail"`
+		TS     int64  `json:"ts"`
+	}
+
+	// Knowledge records a wiki page reaching an agent — read directly, or cited
+	// in the brief that agent was given.
+	Knowledge struct {
+		Kind string `json:"kind"`
+		ID   string `json:"id"`
+		Page string `json:"page"`
+		Via  string `json:"via"`
+		TS   int64  `json:"ts"`
+	}
 )
+
+// activityLimit bounds what a client gets on connect. A long run produces
+// thousands of lines and the panel only ever shows the recent tail.
+const activityLimit = 200
 
 const (
 	RoleLead = "lead"
@@ -61,6 +85,9 @@ type spawnRec struct {
 type Graph struct {
 	mu sync.Mutex
 
+	wikiRoot string
+	home     string
+
 	nodes     map[string]*Node
 	nodeOrder []string
 	edges     map[string]bool
@@ -72,10 +99,16 @@ type Graph struct {
 	childByTool map[string]string
 	childByName map[string]string
 	reportWait  map[string]int64
+
+	activity  []Activity
+	knowledge []Knowledge
+	knowSeen  map[string]bool
 }
 
-func NewGraph() *Graph {
+func NewGraph(wikiRoot, home string) *Graph {
 	return &Graph{
+		wikiRoot:    wikiRoot,
+		home:        home,
 		nodes:       map[string]*Node{},
 		edges:       map[string]bool{},
 		parent:      map[string]string{},
@@ -84,6 +117,7 @@ func NewGraph() *Graph {
 		childByTool: map[string]string{},
 		childByName: map[string]string{},
 		reportWait:  map[string]int64{},
+		knowSeen:    map[string]bool{},
 	}
 }
 
@@ -185,7 +219,6 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 		role, label = RoleLead, LeadNodeID
 	}
 	n, _ := g.node(nodeID, role, label)
-	var out []any
 
 	ts := e.millis()
 	msg := e.decodeMessage()
@@ -194,17 +227,25 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 		n.TS = ts
 	}
 
+	var extra []any
 	state, tool := n.State, n.Tool
 	switch e.Type {
 	case "assistant":
 		state, tool = StateThinking, ""
 		for _, b := range msg.Content {
-			if b.Type != "tool_use" {
-				continue
-			}
-			state, tool = StateTool, b.Name
-			if spawnTools[b.Name] {
-				out = append(out, g.recordSpawn(nodeID, b, ts)...)
+			switch b.Type {
+			case "tool_use":
+				state, tool = StateTool, b.Name
+				in := b.input()
+				extra = append(extra, g.record(nodeID, b.Name, toolDetail(b.Name, in), ts))
+				extra = append(extra, g.recordKnowledge(nodeID, b.Name, in, ts)...)
+				if spawnTools[b.Name] {
+					extra = append(extra, g.recordSpawn(nodeID, b, ts)...)
+				}
+			case "text":
+				if d := shorten(b.Text); d != "" {
+					extra = append(extra, g.record(nodeID, "says", d, ts))
+				}
 			}
 		}
 	case "user":
@@ -213,7 +254,7 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 				continue
 			}
 			state, tool = StateWaiting, ""
-			out = append(out, g.recordReport(b.ToolUseID, ts)...)
+			extra = append(extra, g.recordReport(b.ToolUseID, ts)...)
 		}
 	}
 
@@ -222,15 +263,44 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 		n.State, n.Tool = state, tool
 	}
 
-	out = append(out, *n)
+	// Node first: an activity line names an agent, and the page resolves that
+	// name from the node it has already seen.
+	out := []any{*n}
+	out = append(out, extra...)
 	if p, ok := g.parent[nodeID]; ok {
 		out = append(out, Pulse{Kind: "pulse", From: nodeID, To: p, TS: ts})
 	}
 	return out
 }
 
+func (g *Graph) record(id, tool, detail string, ts int64) any {
+	a := Activity{Kind: "activity", ID: id, Tool: tool, Detail: detail, TS: ts}
+	g.activity = append(g.activity, a)
+	if len(g.activity) > activityLimit {
+		g.activity = g.activity[len(g.activity)-activityLimit:]
+	}
+	return a
+}
+
+// recordKnowledge fires once per agent per page. A lane that greps the wiki
+// forty times is one fact about that lane, not forty.
+func (g *Graph) recordKnowledge(id, tool string, in toolInput, ts int64) []any {
+	var out []any
+	for _, hit := range wikiPages(tool, in, g.wikiRoot, g.home) {
+		key := id + "|" + hit.Page
+		if g.knowSeen[key] {
+			continue
+		}
+		g.knowSeen[key] = true
+		k := Knowledge{Kind: "knowledge", ID: id, Page: hit.Page, Via: hit.Via, TS: ts}
+		g.knowledge = append(g.knowledge, k)
+		out = append(out, k)
+	}
+	return out
+}
+
 func (g *Graph) recordSpawn(from string, b contentBlock, ts int64) []any {
-	in := b.spawn()
+	in := b.input()
 	rec := spawnRec{from: from, toolID: b.ID, name: in.Name, ts: ts}
 	if b.ID != "" {
 		g.spawnByTool[b.ID] = rec
@@ -333,12 +403,18 @@ func (g *Graph) node(id, role, label string) (*Node, bool) {
 func (g *Graph) Snapshot() []any {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	out := make([]any, 0, len(g.nodeOrder)+len(g.edgeOrder))
+	out := make([]any, 0, len(g.nodeOrder)+len(g.edgeOrder)+len(g.knowledge)+len(g.activity))
 	for _, id := range g.nodeOrder {
 		out = append(out, *g.nodes[id])
 	}
 	for _, e := range g.edgeOrder {
 		out = append(out, e)
+	}
+	for _, k := range g.knowledge {
+		out = append(out, k)
+	}
+	for _, a := range g.activity {
+		out = append(out, a)
 	}
 	return out
 }
