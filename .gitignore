@@ -1,0 +1,18 @@
+# The schema is the product. Knowledge never is.
+wiki/concepts/
+wiki/entities/
+wiki/decisions/
+wiki/raw/
+wiki/assets/
+wiki/index.md
+wiki/CHANGELOG.md
+
+# Personal / machine state — never commit
+settings.json
+settings.local.json
+memory/
+projects/
+sessions/
+history.jsonl
+*.local.md
+.DS_Store

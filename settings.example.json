@@ -1,0 +1,70 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "LS",
+      "Edit",
+      "Write",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(yarn:*)",
+      "Bash(npx:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go run:*)",
+      "Bash(gofmt:*)",
+      "Bash(goose:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl:*)",
+      "Bash(psql:*)",
+      "Bash(node:*)",
+      "Bash(cd:*)",
+      "Bash(echo:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/.ssh/**)",
+      "Read(**/*.pem)",
+      "Bash(sudo:*)",
+      "Bash(git push:*)",
+      "Bash(git push -f:*)",
+      "Bash(npm publish:*)",
+      "Bash(yarn publish:*)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "model": "opus",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -iqE \"drop[[:space:]]+(database|table)|truncate\" && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"Destructive DB op (DROP/TRUNCATE) - confirm before running.\"}}' || true"
+          }
+        ]
+      }
+    ]
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "autoCompactEnabled": true
+}
