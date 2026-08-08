@@ -33,6 +33,39 @@ flowchart TD
 
 **The two failure modes:** running *independent* tasks as a team (wasted coordination overhead) or running *dependent* tasks as isolated Agent View sessions (they stomp on each other). Match the mode to the dependency graph, not the task count.
 
+## Where the work happens (isolation)
+
+The framework above picks *who* works; this picks *where*. Independent axes — a team can run in one
+tree or in several.
+
+| Situation | Isolation | How |
+|-----------|-----------|-----|
+| One branch, many files (a team's lanes) | None — scope discipline | each lane owns disjoint paths |
+| Two live branches (PR feedback + a new feature) | One worktree per branch | `git worktree add ../<repo>-<branch> <branch>` for a branch that exists; `claude --worktree` for a new one |
+| Competing attempts at the *same* task | Per-agent worktree | `Agent(..., isolation: "worktree")` |
+
+**Default to none.** Measured on a real 8-agent run: 79 file writes, zero overlap between agents. The
+scope table already prevents collisions, and worktrees cost setup, disk, and the lead's ability to
+verify everything in one tree. They also sever cross-lane dependencies — a lane blocked on another
+lane's endpoints cannot see that lane's code from a separate worktree.
+
+**Reach for worktrees when branches multiply, not when files do.** One checkout holds one branch, so
+two concurrent branches need two directories. Stash-and-switch is not the alternative while agents
+are live: switching the branch under a running session invalidates every file it has read, silently
+and with no error.
+
+Three traps:
+
+- **Worktrees isolate code, not runtime.** A shared Postgres, port, or compose stack still collides —
+  and migrations from one branch land in the database the other is testing against. Give each its own
+  compose project name and ports, or run the stack in one worktree only.
+- **`baseRef` defaults to `fresh`**, branching from `origin/<default-branch>` rather than local HEAD.
+  Commit locally without pushing and the agent starts behind you. Set `worktree.baseRef: "head"`.
+- **`claude --worktree` creates a *new* branch.** For PR feedback you want the branch that already
+  carries the review comments — add it as a worktree instead.
+
+Set `worktree.symlinkDirectories: ["node_modules"]` so each worktree doesn't pay a fresh install.
+
 ## Agents vs Skills (don't confuse them)
 
 - **Agent** = *who* does the work. A delegated context/persona with its own tools and model. Lives in `.claude/agents/<name>.md`. The lead spawns these.
