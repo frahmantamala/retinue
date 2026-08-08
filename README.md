@@ -205,6 +205,47 @@ For agent teams: `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and
 lane's output usually survives review, at the cost of every lane billing at lead tier. Cap unattended
 runs with `--max-budget-usd`; with an Opus crew that is a requirement, not a suggestion.
 
+## Using it
+
+A run, end to end:
+
+```bash
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+export CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"
+
+cd ~/work/your-app
+claude            # then: /run-team, and describe the feature
+```
+
+In a second terminal, watch it work:
+
+```bash
+retinue watch --budget-usd 60
+```
+
+When it finishes, `/capture` writes what was decided into the wiki and pushes it. That is the loop —
+load context, run the crew, verify, gate, record.
+
+The pieces are also useful on their own:
+
+| Want | Use |
+|---|---|
+| A multi-file feature built by a crew | `/run-team` |
+| A design socialised before any code exists | `/rfc-drafter` |
+| A pre-PR review of local changes | `/review-diff` |
+| A new project scaffolded to the house standard | `/new-app` |
+| This session's decisions written down | `/capture` |
+| A specialist framing for the work at hand | `load swe` · `load frontend` · `load pm` · `load designer` · `load qa` |
+
+**Single-threaded is a supported mode, not a failure.** A team is for *dependent, multi-file* work.
+Three independent tasks want Agent View (`claude agents`); one fix wants a plain session. Matching
+the mode to the dependency graph matters more than reaching for the largest one — the decision table
+is in `TEAM-PLAYBOOK.md`, along with when to isolate lanes in worktrees and when not to.
+
+Set `RETINUE_WIKI` if your knowledge base lives somewhere other than `~/work/wiki` — one export
+moves the installer, every skill, and the monitor together. Two machines with different content
+(work and personal, say) is a supported setup; two wikis that never cross-link is the cost.
+
 ## Portability
 
 The substance is runner-neutral; the plumbing is not. The contract, the role definitions, the
@@ -230,6 +271,43 @@ knowledge base publishable at all.
 Also no vector database, no embedding service, no daemon. Plain markdown, plain git, `rg` for
 search. At personal scale that is not a compromise; retrieval quality is not the bottleneck,
 capture is.
+
+## Contributing
+
+This is one person's working setup, published as a shape rather than as a product. That makes some
+contributions straightforward and others a non-starter, so it is worth saying which is which.
+
+**Welcome:** bugs in the monitor, a part of the contract that failed under a real run, an agent
+persona or pattern file that generalises beyond one stack, an adapter for another runner,
+documentation that was wrong or unclear.
+
+**Not accepted:** knowledge. `wiki/` ships the schema and never pages — yours belong in your wiki,
+mine in mine. Nor anything that bakes a path, a stack, or a model preference into a file meant for
+everyone; `settings.example.json` is small on purpose, and the wiki root is a variable for the same
+reason.
+
+Before opening a PR:
+
+```bash
+gofmt -l .                                        # must print nothing
+go build ./... && go vet ./... && go test -race ./...
+shellcheck --severity=warning scripts/*.sh
+```
+
+CI runs those, plus two checks worth knowing about. The monitor's page is `go:embed`ed, so a
+JavaScript syntax error in it **compiles perfectly clean** and fails only in a browser — the script
+is extracted and parsed separately. And that page must stay self-contained: a CDN reference in a
+localhost tool is a network dependency nobody asked for, so the build fails if one appears.
+
+Conventions that will come up in review:
+
+- **Comments explain why, never what.** No narrative blocks, no banners, no commented-out code.
+- **Prose stays sparse.** A page that grew two topics gets split.
+- **Claims are measured, not asserted.** The cost figures and the isolation rule in this README came
+  from reading real transcripts. Change one and change its measurement with it.
+- **Publish the shape, never the particulars.** No client or employer names, and no real session data
+  in test fixtures — synthesise them. A fixture copied from a live run carries whole prompts, file
+  paths, and domain vocabulary into a public repo, and nobody re-reads a fixture before merging.
 
 ## Status
 
