@@ -117,6 +117,21 @@ For agent teams: `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and
 lane's output usually survives review, at the cost of every lane billing at lead tier. Cap unattended
 runs with `--max-budget-usd`; with an Opus crew that is a requirement, not a suggestion.
 
+## Portability
+
+The substance is runner-neutral; the plumbing is not. The contract, the role definitions, the
+patterns, and the wiki schema are plain markdown that any file-reading agent can follow —
+`AGENTS.md` is the neutral entry point for runners that look for it (Codex, Cursor) rather than for
+`CLAUDE.md`.
+
+What is Claude Code-specific is the wiring: skill invocation, per-role model frontmatter,
+`settings.json` permissions and hooks, and agent teams. `AGENTS.md` lists each one and what it maps
+to elsewhere. The loop itself degrades gracefully — a runner with no crew support can follow it
+single-threaded: decompose, do one lane, verify, gate, capture. Slower, not broken.
+
+The adapters for other runners are not written yet, and I would rather ship an honest small claim
+than an untested directory named `adapters/codex/`.
+
 ## What is deliberately not here
 
 No knowledge. `wiki/` ships the schema and the three operations; the pages are gitignored, because
