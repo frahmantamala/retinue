@@ -53,7 +53,27 @@ type (
 		Via  string `json:"via"`
 		TS   int64  `json:"ts"`
 	}
+
+	// Run is the whole-run summary: how far along, how long it has taken, and
+	// how fast money is going out. Recomputed per tail cycle, not per event.
+	Run struct {
+		Kind       string  `json:"kind"`
+		StartedTS  int64   `json:"startedTs"`
+		LatestTS   int64   `json:"latestTs"`
+		TasksTotal int     `json:"tasksTotal"`
+		TasksDone  int     `json:"tasksDone"`
+		TasksLive  int     `json:"tasksLive"`
+		Spent      float64 `json:"spent"`
+		Budget     float64 `json:"budget"`
+		// BurnPerHour is measured over a trailing window, not the whole run —
+		// a lifetime average is meaningless once a run has idled.
+		BurnPerHour float64 `json:"burnPerHour"`
+	}
 )
+
+// burnWindow bounds the trailing span used for the burn rate. Long enough to
+// smooth per-turn spikes, short enough that an idle stretch decays out.
+const burnWindow = 10 * 60 * 1000 // ms
 
 // activityLimit bounds what a client gets on connect. A long run produces
 // thousands of lines and the panel only ever shows the recent tail.
@@ -92,6 +112,7 @@ type Graph struct {
 
 	wikiRoot string
 	home     string
+	budget   float64
 
 	nodes     map[string]*Node
 	nodeOrder []string
@@ -108,6 +129,24 @@ type Graph struct {
 	activity  []Activity
 	knowledge []Knowledge
 	knowSeen  map[string]bool
+
+	tasksCreated int
+	taskState    map[string]taskMark
+	spend        []spendSample
+	firstTS      int64
+	latestTS     int64
+}
+
+// taskMark keeps the timestamp so the newest status wins regardless of the
+// order the files happened to be read in.
+type taskMark struct {
+	status string
+	ts     int64
+}
+
+type spendSample struct {
+	ts   int64
+	cost float64
 }
 
 func NewGraph(wikiRoot, home string) *Graph {
@@ -123,6 +162,7 @@ func NewGraph(wikiRoot, home string) *Graph {
 		childByName: map[string]string{},
 		reportWait:  map[string]int64{},
 		knowSeen:    map[string]bool{},
+		taskState:   map[string]taskMark{},
 	}
 }
 
@@ -232,12 +272,23 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 		n.Model = msg.Model
 	}
 	if r, ok := rateFor(msg.Model, msg.Usage.Speed, ts); ok {
-		n.Cost += r.cost(msg.Usage)
+		if spent := r.cost(msg.Usage); spent > 0 {
+			n.Cost += spent
+			g.spend = append(g.spend, spendSample{ts: ts, cost: spent})
+		}
 	} else {
 		n.Unpriced += msg.Usage.billed()
 	}
 	if ts > n.TS {
 		n.TS = ts
+	}
+	if ts > 0 {
+		if g.firstTS == 0 || ts < g.firstTS {
+			g.firstTS = ts
+		}
+		if ts > g.latestTS {
+			g.latestTS = ts
+		}
 	}
 
 	var extra []any
@@ -252,6 +303,7 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 				in := b.input()
 				extra = append(extra, g.record(nodeID, b.Name, toolDetail(b.Name, in), ts))
 				extra = append(extra, g.recordKnowledge(nodeID, b.Name, in, ts)...)
+				g.recordTask(b.Name, in, ts)
 				if spawnTools[b.Name] {
 					extra = append(extra, g.recordSpawn(nodeID, b, ts)...)
 				}
@@ -293,6 +345,85 @@ func (g *Graph) record(id, tool, detail string, ts int64) any {
 		g.activity = g.activity[len(g.activity)-activityLimit:]
 	}
 	return a
+}
+
+// SetBudget sets the ceiling the run is projected against. Zero means no
+// ceiling — the page then shows a burn rate and no exhaustion estimate.
+func (g *Graph) SetBudget(usd float64) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.budget = usd
+}
+
+// recordTask follows the lead's shared task list. Creation is counted rather
+// than identified: the tool call carries no id (the id comes back in the
+// result), and a count is all the progress figure needs.
+func (g *Graph) recordTask(tool string, in toolInput, ts int64) {
+	switch tool {
+	case "TaskCreate":
+		g.tasksCreated++
+	case "TaskUpdate":
+		if in.TaskID == "" || in.Status == "" {
+			return // an owner-only or blocked-by-only update carries no status
+		}
+		// Newest status wins on timestamp, not arrival: transcripts are tailed
+		// independently, so arrival order is not chronological order.
+		if prev, ok := g.taskState[in.TaskID]; ok && prev.ts > ts {
+			return
+		}
+		g.taskState[in.TaskID] = taskMark{status: in.Status, ts: ts}
+	}
+}
+
+// RunSummary is the whole-run rollup.
+func (g *Graph) RunSummary() Run {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.runSummary()
+}
+
+func (g *Graph) runSummary() Run {
+	r := Run{
+		Kind:       "run",
+		StartedTS:  g.firstTS,
+		LatestTS:   g.latestTS,
+		TasksTotal: g.tasksCreated,
+		Budget:     g.budget,
+	}
+	for _, n := range g.nodes {
+		r.Spent += n.Cost
+	}
+	for _, m := range g.taskState {
+		switch m.status {
+		case "completed":
+			r.TasksDone++
+		case "in_progress":
+			r.TasksLive++
+		}
+	}
+	if r.TasksDone > r.TasksTotal {
+		r.TasksTotal = r.TasksDone // a task created before the log we can see
+	}
+
+	// Burn over the trailing window only. Two samples are the minimum for a
+	// rate; below that the honest answer is "not yet known".
+	cutoff := g.latestTS - burnWindow
+	kept, windowCost, earliest := g.spend[:0], 0.0, int64(0)
+	for _, s := range g.spend {
+		if s.ts < cutoff {
+			continue
+		}
+		kept = append(kept, s)
+		windowCost += s.cost
+		if earliest == 0 || s.ts < earliest {
+			earliest = s.ts
+		}
+	}
+	g.spend = kept
+	if span := g.latestTS - earliest; span > 0 && windowCost > 0 {
+		r.BurnPerHour = windowCost / (float64(span) / 3_600_000)
+	}
+	return r
 }
 
 // recordKnowledge fires once per agent per page. A lane that greps the wiki
@@ -429,5 +560,5 @@ func (g *Graph) Snapshot() []any {
 	for _, a := range g.activity {
 		out = append(out, a)
 	}
-	return out
+	return append(out, g.runSummary())
 }

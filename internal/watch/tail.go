@@ -33,6 +33,7 @@ type Watcher struct {
 	sources     map[string]*source
 	pendingMeta map[string]bool
 	skipped     int
+	lastRun     Run
 }
 
 func NewWatcher(sess Session, g *Graph, h *Hub, interval time.Duration, logf func(string, ...any)) *Watcher {
@@ -78,6 +79,12 @@ func (w *Watcher) start() {
 func (w *Watcher) pass() {
 	w.scan()
 	w.poll()
+	// Once per cycle rather than per event: the rollup changes on almost every
+	// line, and a quiet run then publishes nothing at all.
+	if r := w.graph.RunSummary(); r != w.lastRun {
+		w.lastRun = r
+		w.hub.Publish([]any{r})
+	}
 }
 
 // scan picks up teammate transcripts that appear after the run starts.

@@ -52,6 +52,8 @@ flags:
   --repo <path>    repository whose sessions to look in (default: .)
   --port <n>       localhost port (default: 7777)
   --interval <d>   poll interval (default: 500ms)
+  --wiki <path>    knowledge base root (default: ~/work/wiki)
+  --budget-usd <n> spend ceiling to project against (default: none)
 `)
 }
 
@@ -62,6 +64,7 @@ func runWatch(args []string) error {
 	port := fs.Int("port", 7777, "localhost port")
 	interval := fs.Duration("interval", 500*time.Millisecond, "poll interval")
 	wiki := fs.String("wiki", "", "knowledge base root (default: ~/work/wiki)")
+	budget := fs.Float64("budget-usd", 0, "spend ceiling to project against (0: no ceiling)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -79,6 +82,7 @@ func runWatch(args []string) error {
 	}
 
 	graph := watch.NewGraph(*wiki, home)
+	graph.SetBudget(*budget)
 	hub := watch.NewHub()
 	watcher := watch.NewWatcher(sess, graph, hub, *interval, log.Printf)
 

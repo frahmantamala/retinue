@@ -69,6 +69,13 @@
   #rail h2 span { color: var(--dim); }
   #rail ul { list-style: none; margin: 0; padding: 0 16px 10px; overflow-y: auto; }
   #knowledge { max-height: 32vh; }
+  #run { padding: 0 16px 10px; }
+  #run .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+  #run .k { color: var(--muted); }
+  #run .v { text-align: right; }
+  #run .v.accent { color: var(--marigold); }
+  #run .v.warn { color: #c1553f; }
+  #run .v.soft { color: var(--muted); }
   #activity { flex: 1; }
   #rail li { display: flex; gap: 8px; padding: 2px 0; align-items: baseline; }
   #rail li.none { color: var(--dim); }
@@ -100,6 +107,10 @@
 
 <aside id="rail">
   <section>
+    <h2>run</h2>
+    <div id="run"><div class="row"><span class="k">waiting</span><span class="v">—</span></div></div>
+  </section>
+  <section>
     <h2>knowledge <span id="knowledgeCount"></span></h2>
     <ul id="knowledge"><li class="none">no wiki pages reached the crew yet</li></ul>
   </section>
@@ -129,6 +140,7 @@
 
   const railEl = document.getElementById("rail");
   const spendEl = document.getElementById("spend");
+  const runEl = document.getElementById("run");
   const activityEl = document.getElementById("activity");
   const knowledgeEl = document.getElementById("knowledge");
   const knowledgeCount = document.getElementById("knowledgeCount");
@@ -271,7 +283,59 @@
     }
   }
 
+  function fmtDuration(ms) {
+    if (!ms || ms < 0) return "—";
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return s + "s";
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + "m";
+    return Math.floor(m / 60) + "h " + (m % 60) + "m";
+  }
+
+  function renderRun(r) {
+    const rows = [];
+    const elapsed = r.latestTs && r.startedTs ? r.latestTs - r.startedTs : 0;
+    rows.push(["elapsed", fmtDuration(elapsed), ""]);
+
+    if (r.tasksTotal) {
+      const live = r.tasksLive ? `, ${r.tasksLive} running` : "";
+      rows.push(["tasks", `${r.tasksDone} of ${r.tasksTotal} done${live}`, ""]);
+      // Linear extrapolation on task count. Lanes are not equal size — this is
+      // a rough read, and the title says so rather than implying precision.
+      if (r.tasksDone > 0 && r.tasksDone < r.tasksTotal && elapsed > 0) {
+        const perTask = elapsed / r.tasksDone;
+        rows.push(["~left", fmtDuration((r.tasksTotal - r.tasksDone) * perTask), "soft",
+          "Rough: elapsed per completed task, extrapolated. Lanes differ in size."]);
+      }
+    }
+
+    if (r.burnPerHour > 0) rows.push(["burn", fmtCost(r.burnPerHour) + " / hr", "accent"]);
+
+    if (r.budget > 0) {
+      const left = r.budget - r.spent;
+      if (left <= 0) {
+        rows.push(["budget", `${fmtCost(r.budget)} — over by ${fmtCost(-left)}`, "warn"]);
+      } else if (r.burnPerHour > 0) {
+        const hours = left / r.burnPerHour;
+        rows.push(["budget", `${fmtCost(left)} left — ${fmtDuration(hours * 3600000)}`,
+          hours < 1 ? "warn" : ""]);
+      } else {
+        rows.push(["budget", `${fmtCost(left)} left`, ""]);
+      }
+    }
+
+    runEl.textContent = "";
+    for (const [k, v, cls, title] of rows) {
+      const row = document.createElement("div");
+      row.className = "row";
+      if (title) row.title = title;
+      row.innerHTML = `<span class="k">${escapeHtml(k)}</span><span class="v ${cls || ""}">${escapeHtml(v)}</span>`;
+      runEl.append(row);
+    }
+  }
+
   function handle(m) {
+    if (m.kind === "run") return renderRun(m);
     if (m.kind === "node") upsertNode(m);
     else if (m.kind === "edge") addEdge(m);
     else if (m.kind === "pulse") pulses.push({ from: m.from, to: m.to, t0: performance.now() });

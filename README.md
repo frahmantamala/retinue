@@ -110,6 +110,27 @@ lane3-fe       claude-opus-4-8   1850k   $17.90
 That is a real run. `--max-budget-usd` is only a decision you can make once you have seen this
 number, and one lane costing six times another is a lane-sizing problem you want at minute five.
 
+A run panel answers the two questions you actually have while it works — how far along, and how
+long the money lasts:
+
+```
+elapsed   56m
+tasks     4 of 4 done
+burn      $194.15 / hr
+budget    $52.79 left — 16m
+```
+
+Progress comes from the lead's own shared task list (`TaskCreate` / `TaskUpdate` in the transcript),
+not from guesswork. Burn is measured over a trailing ten-minute window rather than the run's
+lifetime — that run averaged $104/hr but was burning $194/hr at the end, when the most lanes were
+running at once, and a lifetime average would have told you the comfortable number instead of the
+true one. Pass `--budget-usd` to get the time-to-exhaustion line.
+
+The time-remaining estimate extrapolates elapsed-per-completed-task, so it is a rough read and the
+UI says so: lanes are not equal size. There is no "percent of your plan used" — your account's token
+limits are not exposed anywhere on this machine, and a number invented for that line would be worse
+than no line at all.
+
 Alongside it, a rail carries the two things a graph cannot show: a rolling feed of what each agent
 is actually doing — `Bash · Run the suite`, `Read · concepts/tenancy.md` — and **where knowledge
 came from**.

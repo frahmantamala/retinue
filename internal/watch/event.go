@@ -66,6 +66,8 @@ type toolInput struct {
 	Query       string `json:"query"`
 	URL         string `json:"url"`
 	Prompt      string `json:"prompt"`
+	TaskID      string `json:"taskId"`
+	Status      string `json:"status"`
 }
 
 func (b contentBlock) input() toolInput {
