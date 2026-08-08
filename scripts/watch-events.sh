@@ -6,9 +6,9 @@
 # in order.
 #
 #   scripts/watch-events.sh                    # newest session in the current repo
-#   scripts/watch-events.sh ~/work/klinesa     # newest session in another repo
+#   scripts/watch-events.sh ~/work/your-app    # newest session in another repo
 #   scripts/watch-events.sh <session-id>       # a specific session in the current repo
-#   scripts/watch-events.sh ~/work/klinesa <session-id>
+#   scripts/watch-events.sh ~/work/your-app <session-id>
 #   scripts/watch-events.sh -n 0               # live only, no backfill (default backfill: 10)
 #
 # Level 3 teammates do NOT appear as isSidechain lines in the lead transcript — they get their

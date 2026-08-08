@@ -100,11 +100,11 @@ and cache writes bill at different rates (a 1-hour cache write costs 2× input; 
 A model with no published rate is reported as unpriced rather than counted as free.
 
 ```
-lane1-be-iam   claude-opus-4-8   3920k   $34.84
-team-lead      claude-opus-5     1165k   $26.46
-lane3-fe       claude-opus-4-8   1850k   $17.90
-...                                      ------
-                                         $97.21
+lane1-backend   claude-opus-4-8   3920k   $34.84
+team-lead       claude-opus-5     1165k   $26.46
+lane3-frontend  claude-opus-4-8   1850k   $17.90
+...                                       ------
+                                          $97.21
 ```
 
 That is a real run. `--max-budget-usd` is only a decision you can make once you have seen this
@@ -137,8 +137,8 @@ came from**.
 
 ```
 read   concepts/agent-supervision-contract           lead
-brief  decisions/2026-07-18-monolith-first           lane1-be-iam
-wrote  decisions/2026-08-09-permission-gating        lead
+brief  decisions/2026-07-18-monolith-first           lane1-backend
+wrote  decisions/2026-07-19-cache-ttl-tradeoff       lead
 ```
 
 `read` is an agent opening a page. `brief` is the lead citing one in the prompt it wrote for a
