@@ -179,7 +179,7 @@ boundaries stop parallel agents from quietly overwriting each other.
 ## Install
 
 ```bash
-git clone https://github.com/<you>/retinue.git ~/work/retinue
+git clone https://github.com/frahmantamala/retinue.git ~/work/retinue
 cd ~/work/retinue && ./install.sh
 ```
 
