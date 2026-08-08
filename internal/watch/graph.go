@@ -6,14 +6,19 @@ import "sync"
 // these three shapes and nothing else.
 type (
 	Node struct {
-		Kind   string `json:"kind"`
-		ID     string `json:"id"`
-		Role   string `json:"role"`
-		Label  string `json:"label"`
-		State  string `json:"state"`
-		Tool   string `json:"tool,omitempty"`
-		Tokens int    `json:"tokens"`
-		TS     int64  `json:"ts"`
+		Kind   string  `json:"kind"`
+		ID     string  `json:"id"`
+		Role   string  `json:"role"`
+		Label  string  `json:"label"`
+		State  string  `json:"state"`
+		Tool   string  `json:"tool,omitempty"`
+		Tokens int     `json:"tokens"`
+		Cost   float64 `json:"cost"`
+		Model  string  `json:"model,omitempty"`
+		// Unpriced counts tokens from a model this build has no rate for, so
+		// the page can say the total is partial instead of quietly low.
+		Unpriced int   `json:"unpriced"`
+		TS       int64 `json:"ts"`
 	}
 	Edge struct {
 		Kind string `json:"kind"`
@@ -223,6 +228,14 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 	ts := e.millis()
 	msg := e.decodeMessage()
 	n.Tokens += msg.Usage.billed()
+	if msg.Model != "" {
+		n.Model = msg.Model
+	}
+	if r, ok := rateFor(msg.Model, msg.Usage.Speed, ts); ok {
+		n.Cost += r.cost(msg.Usage)
+	} else {
+		n.Unpriced += msg.Usage.billed()
+	}
 	if ts > n.TS {
 		n.TS = ts
 	}

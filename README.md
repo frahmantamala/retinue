@@ -94,6 +94,22 @@ localhost — lead in marigold, crew in white, radius by tokens spent, a dot cro
 time an agent produces a message. Spawn edges come from the `Agent` tool call, report edges from its
 matching result, so a lane that never came back stays visibly open instead of quietly looking done.
 
+Each node carries **what it has cost so far**, priced per turn from the model that actually served
+it — the lead and the crew often run different models, and each turn's input, output, cache reads
+and cache writes bill at different rates (a 1-hour cache write costs 2× input; a 5-minute one 1.25×).
+A model with no published rate is reported as unpriced rather than counted as free.
+
+```
+lane1-be-iam   claude-opus-4-8   3920k   $34.84
+team-lead      claude-opus-5     1165k   $26.46
+lane3-fe       claude-opus-4-8   1850k   $17.90
+...                                      ------
+                                         $97.21
+```
+
+That is a real run. `--max-budget-usd` is only a decision you can make once you have seen this
+number, and one lane costing six times another is a lane-sizing problem you want at minute five.
+
 Alongside it, a rail carries the two things a graph cannot show: a rolling feed of what each agent
 is actually doing — `Bash · Run the suite`, `Read · concepts/tenancy.md` — and **where knowledge
 came from**.

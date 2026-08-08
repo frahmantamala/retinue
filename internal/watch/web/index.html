@@ -32,6 +32,8 @@
   h1 { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; margin: 0; color: var(--marigold); }
   .meta { color: var(--muted); }
   .meta b { color: var(--ink); font-weight: 400; }
+  #spend b { color: var(--marigold); }
+  #spend .partial { color: #c1553f; }
   #status { margin-left: auto; color: var(--muted); }
   #status.live::before { content: "● "; color: #7fb069; }
   #status.down::before { content: "● "; color: #c1553f; }
@@ -87,6 +89,7 @@
 <header>
   <h1>retinue watch</h1>
   <div class="meta" id="sessionMeta"></div>
+  <div class="meta" id="spend"></div>
   <div id="status">connecting</div>
 </header>
 
@@ -125,6 +128,7 @@
   const emptyWhy = document.getElementById("emptyWhy");
 
   const railEl = document.getElementById("rail");
+  const spendEl = document.getElementById("spend");
   const activityEl = document.getElementById("activity");
   const knowledgeEl = document.getElementById("knowledge");
   const knowledgeCount = document.getElementById("knowledgeCount");
@@ -180,8 +184,28 @@
     n.state = m.state;
     n.tool = m.tool || "";
     n.tokens = m.tokens || 0;
+    n.cost = m.cost || 0;
+    n.model = m.model || "";
+    n.unpriced = m.unpriced || 0;
     n.ts = m.ts || 0;
     n.hit = performance.now();
+    renderSpend();
+  }
+
+  function renderSpend() {
+    let total = 0, unpriced = 0;
+    for (const n of nodes.values()) { total += n.cost || 0; unpriced += n.unpriced || 0; }
+    if (!total && !unpriced) { spendEl.textContent = ""; return; }
+    // A model with no published rate is reported, never folded into the total
+    // as zero — a low number you trust is worse than one you know is partial.
+    spendEl.innerHTML = `<b>${fmtCost(total)}</b> spent` +
+      (unpriced ? ` <span class="partial" title="${unpriced} tokens on a model with no rate in this build">+ unpriced</span>` : "");
+  }
+
+  function fmtCost(c) {
+    if (!c) return "$0";
+    if (c < 0.01) return "<$0.01";
+    return "$" + c.toFixed(2);
   }
 
   function addEdge(m) {
@@ -407,9 +431,10 @@
       ctx.fillText(sub, n.x, n.y + r + 29);
 
       const tk = fmtTokens(n.tokens);
-      if (tk) {
+      const spend = n.cost ? fmtCost(n.cost) : "";
+      if (tk || spend) {
         ctx.fillStyle = "rgba(107,107,100,.7)";
-        ctx.fillText(tk, n.x, n.y + r + 41);
+        ctx.fillText([tk, spend].filter(Boolean).join(" · "), n.x, n.y + r + 41);
       }
     }
   }
