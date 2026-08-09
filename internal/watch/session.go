@@ -195,7 +195,9 @@ func selectionReason(total int, tied []candidate) string {
 	}
 	when := "no timestamp"
 	if tied[0].last > 0 {
-		when = time.UnixMilli(tied[0].last).Format(time.RFC3339)
+		// UTC because transcripts stamp their events in UTC — a local rendering
+		// here cannot be compared by eye against the file it came from.
+		when = time.UnixMilli(tied[0].last).UTC().Format(time.RFC3339)
 	}
 	return fmt.Sprintf("newest of %d transcripts; %d modified within %s of each other, "+
 		"chose the most recently active (last event %s, %d bytes)",
