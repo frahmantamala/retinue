@@ -200,6 +200,23 @@ cd ~/work/retinue && ./install.sh
 Symlinks, so editing the repo takes effect immediately and `git pull` on another machine syncs your
 whole setup. Existing files are backed up to `/tmp/claude-bak/` first.
 
+When installing on a second machine, set `RETINUE_WIKI` before running the installer, not after.
+`install.sh` reads it once, at run time, and puts the wiki schema wherever it points —
+defaulting to `~/work/wiki`. If that directory does not exist the installer prints a note and
+continues, so a value you meant to set and didn't fails quietly rather than loudly.
+
+```bash
+export RETINUE_WIKI=~/work/wiki-work           # in that machine's shell profile
+mkdir -p "$RETINUE_WIKI"
+cd ~/work/retinue && ./install.sh
+```
+
+This matters most on a work laptop. A wiki accumulates client pricing, employer decisions, and
+domain facts, so letting the office machine take the default means office work reads from and
+writes into the same graph as everything personal — a separation problem, not a path preference.
+Give that second wiki its own private remote rather than cloning the first. One export moves the
+installer, every skill, and the monitor together; two wikis that never cross-link is the cost.
+
 `agents/`, `skills/`, and `templates/` are linked **per entry** rather than as whole directories, so
 any agent or skill you keep locally but don't publish survives an install. `settings.json` is
 deliberately not linked at all — it holds machine-specific state and would fight you across two
@@ -255,10 +272,6 @@ The pieces are also useful on their own:
 Three independent tasks want Agent View (`claude agents`); one fix wants a plain session. Matching
 the mode to the dependency graph matters more than reaching for the largest one — the decision table
 is in `TEAM-PLAYBOOK.md`, along with when to isolate lanes in worktrees and when not to.
-
-Set `RETINUE_WIKI` if your knowledge base lives somewhere other than `~/work/wiki` — one export
-moves the installer, every skill, and the monitor together. Two machines with different content
-(work and personal, say) is a supported setup; two wikis that never cross-link is the cost.
 
 ## Portability
 
