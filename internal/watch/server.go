@@ -4,7 +4,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -30,7 +32,33 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /", s.page)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /session", s.session)
-	return mux
+	return localOnly(mux)
+}
+
+// localOnly rejects any request that did not address the server by a loopback
+// name. Binding to 127.0.0.1 alone does not close the hole: an attacker page
+// served from a hostname that resolves to loopback is same-origin to the
+// browser, so CORS never applies and it can read /events and /session — file
+// paths, shell descriptions, wiki pages, the repo and transcript paths.
+func localOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !loopbackHost(r.Host) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func loopbackHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	switch strings.ToLower(strings.TrimSuffix(host, ".")) {
+	case "localhost", "127.0.0.1", "::1", "[::1]":
+		return true
+	}
+	return false
 }
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {

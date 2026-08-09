@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 const detailMax = 84
@@ -60,12 +61,22 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
+// shorten measures and cuts on runes: a byte cut lands mid-rune on any
+// non-ASCII path or description, and json.Marshal rewrites the broken tail to
+// U+FFFD before it ever reaches the browser.
 func shorten(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) <= detailMax {
+	if utf8.RuneCountInString(s) <= detailMax {
 		return s
 	}
-	return s[:detailMax-1] + "…"
+	n := 0
+	for i := range s {
+		if n == detailMax-1 {
+			return s[:i] + "…"
+		}
+		n++
+	}
+	return s
 }
 
 // Knowledge provenance.

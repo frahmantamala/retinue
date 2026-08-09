@@ -49,9 +49,13 @@ func (m agentMeta) label(fallback string) string {
 }
 
 // ProjectDirFor maps a repo path to its transcript directory the way Claude
-// Code does: every separator becomes a dash.
+// Code does: separators AND dots both become dashes. Missing the dot rule
+// breaks every path with a hidden directory in it — notably worktrees under
+// ~/.claude/worktrees, which the team playbook recommends creating.
+var projectDirEscape = strings.NewReplacer(string(filepath.Separator), "-", ".", "-")
+
 func ProjectDirFor(home, repo string) string {
-	return filepath.Join(home, ".claude", "projects", strings.ReplaceAll(repo, string(filepath.Separator), "-"))
+	return filepath.Join(home, ".claude", "projects", projectDirEscape.Replace(repo))
 }
 
 // Discover resolves the session to watch. An empty id selects the most recently

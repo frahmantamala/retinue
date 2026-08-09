@@ -21,6 +21,11 @@ type event struct {
 }
 
 type message struct {
+	// ID identifies the assistant turn. One turn is split across several JSONL
+	// lines — one per thinking/tool_use block — and every one of those lines
+	// repeats the same full usage object. Folding usage per line rather than
+	// per ID overstates spend by the number of blocks in the turn.
+	ID      string        `json:"id"`
 	Content contentBlocks `json:"content"`
 	Usage   usage         `json:"usage"`
 	Model   string        `json:"model"`
@@ -96,7 +101,7 @@ func (c *contentBlocks) UnmarshalJSON(b []byte) error {
 	}
 	var s string
 	if err := json.Unmarshal(b, &s); err == nil {
-		*c = contentBlocks{{Type: "text"}}
+		*c = contentBlocks{{Type: "text", Text: s}}
 		return nil
 	}
 	return nil

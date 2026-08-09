@@ -100,11 +100,11 @@ and cache writes bill at different rates (a 1-hour cache write costs 2× input; 
 A model with no published rate is reported as unpriced rather than counted as free.
 
 ```
-lane1-backend   claude-opus-4-8   3920k   $34.84
-team-lead       claude-opus-5     1165k   $26.46
-lane3-frontend  claude-opus-4-8   1850k   $17.90
+lane1-backend   claude-opus-4-8   1507k   $13.40
+team-lead       claude-opus-5      448k   $10.17
+lane3-frontend  claude-opus-4-8    711k    $6.88
 ...                                       ------
-                                          $97.21
+                                          $37.36
 ```
 
 That is a real run. `--max-budget-usd` is only a decision you can make once you have seen this
@@ -116,13 +116,13 @@ long the money lasts:
 ```
 elapsed   56m
 tasks     4 of 4 done
-burn      $194.15 / hr
-budget    $52.79 left — 16m
+burn      $74.67 / hr
+budget    $22.64 left — 18m
 ```
 
 Progress comes from the lead's own shared task list (`TaskCreate` / `TaskUpdate` in the transcript),
 not from guesswork. Burn is measured over a trailing ten-minute window rather than the run's
-lifetime — that run averaged $104/hr but was burning $194/hr at the end, when the most lanes were
+lifetime — that run averaged $40/hr but was burning $75/hr at the end, when the most lanes were
 running at once, and a lifetime average would have told you the comfortable number instead of the
 true one. Pass `--budget-usd` to get the time-to-exhaustion line.
 

@@ -140,7 +140,13 @@ func (w *Watcher) read(s *source) {
 		return
 	}
 	if fi.Size() < s.off {
-		s.off = 0 // truncated or replaced
+		// Truncated or replaced. Rewinding can re-emit activity rows, which is
+		// accepted: usage is deduplicated per turn in graph.go, so no token or
+		// cost is double-counted. Skipping a line count instead would silently
+		// drop the opening events of a genuinely different file — the likelier
+		// cause of a shrink, since transcripts are append-only — and visible
+		// duplication beats silent loss.
+		s.off = 0
 	}
 	if fi.Size() == s.off {
 		return

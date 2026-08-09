@@ -3,6 +3,7 @@ package watch
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestRunSummaryTracksTheSharedTaskList(t *testing.T) {
@@ -48,9 +49,11 @@ func TestTaskStatusNewestWinsByTimestamp(t *testing.T) {
 }
 
 // A lifetime average is meaningless once a run has idled — only the trailing
-// window counts toward the rate.
+// window counts toward the rate. The window is measured against wall clock, so
+// the clock is pinned to the newest turn to hold the run "live".
 func TestBurnRateUsesTrailingWindowOnly(t *testing.T) {
 	g := NewGraph("", "")
+	g.now = func() time.Time { return time.Date(2026, 8, 8, 16, 35, 0, 0, time.UTC) }
 	g.EnsureLead("lead")
 	turn := func(stamp string) string {
 		return `{"type":"assistant","uuid":"x","timestamp":"` + stamp +

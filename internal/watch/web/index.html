@@ -152,6 +152,12 @@
 
   const PULSE_MS = 900;
   const ACTIVITY_ROWS = 80;
+  // The server subscribes before it snapshots, so a client connecting mid-run
+  // receives any delta in that window twice. Nodes and edges are idempotent
+  // upserts; an activity row is not, so it is deduped on its seq. Every seq
+  // ever rendered is kept — a high-water mark would drop a row that arrived
+  // out of order and was never shown.
+  const seenActivity = new Set();
   let width = 0, height = 0, dpr = 1;
 
   function resize() {
@@ -236,6 +242,11 @@
   }
 
   function pushActivity(m) {
+    if (Number.isInteger(m.seq)) {
+      if (seenActivity.has(m.seq)) return;
+      seenActivity.add(m.seq);
+    }
+
     const none = activityEl.querySelector(".none");
     if (none) none.remove();
 

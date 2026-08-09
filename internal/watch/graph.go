@@ -1,6 +1,9 @@
 package watch
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // Wire format. Pinned by _design/MONITOR-LANES.md — the page renders exactly
 // these three shapes and nothing else.
@@ -37,7 +40,11 @@ type (
 	// Activity is one readable line of what an agent just did. Additive to the
 	// pinned contract: the three shapes above are unchanged.
 	Activity struct {
-		Kind   string `json:"kind"`
+		Kind string `json:"kind"`
+		// Seq is the line's identity, stable across the live delta and every
+		// later snapshot replay of it. Timestamps repeat within a turn, so the
+		// page has nothing else to dedupe a reconnect against.
+		Seq    int64  `json:"seq"`
 		ID     string `json:"id"`
 		Tool   string `json:"tool"`
 		Detail string `json:"detail"`
@@ -71,8 +78,10 @@ type (
 	}
 )
 
-// burnWindow bounds the trailing span used for the burn rate. Long enough to
-// smooth per-turn spikes, short enough that an idle stretch decays out.
+// burnWindow bounds the trailing span used for the burn rate. It is measured
+// against wall clock, not against the last event read: anchoring it to the log
+// freezes both ends the moment a run goes quiet, and the page then shows a live
+// rate for a run that has done nothing for an hour.
 const burnWindow = 10 * 60 * 1000 // ms
 
 // activityLimit bounds what a client gets on connect. A long run produces
@@ -121,20 +130,47 @@ type Graph struct {
 	parent    map[string]string
 
 	spawnByTool map[string]spawnRec
-	spawnByName map[string]spawnRec
 	childByTool map[string]string
-	childByName map[string]string
-	reportWait  map[string]int64
+	// spawnWait and childWait are the two halves of the name join, queued rather
+	// than mapped: the same lane name is spawned again after a restart, and a
+	// last-write-wins map would hand the second agent the first one's result.
+	spawnWait  map[string][]spawnRec
+	childWait  map[string][]string
+	reportWait map[string]int64
+	// claimed keeps a name claim to one attempt per agent. Register is called
+	// again whenever a sidecar is re-read, and a second claim would take the
+	// next agent's spawn record.
+	claimed map[string]bool
 
-	activity  []Activity
-	knowledge []Knowledge
-	knowSeen  map[string]bool
+	activity    []Activity
+	activitySeq int64
+	knowledge   []Knowledge
+	knowSeen    map[string]bool
 
 	tasksCreated int
 	taskState    map[string]taskMark
 	spend        []spendSample
 	firstTS      int64
 	latestTS     int64
+	countedTurns map[string]bool
+
+	// now is injectable so the burn window can be exercised deterministically.
+	now func() time.Time
+}
+
+// usageCounted reports whether this turn's usage has already been folded in,
+// and records it if not. An empty id means the line carries no turn identity —
+// count it, since there is nothing to deduplicate against. Bounded by turns
+// rather than lines, so a long run costs one small string per turn.
+func (g *Graph) usageCounted(messageID string) bool {
+	if messageID == "" {
+		return false
+	}
+	if g.countedTurns[messageID] {
+		return true
+	}
+	g.countedTurns[messageID] = true
+	return false
 }
 
 // taskMark keeps the timestamp so the newest status wins regardless of the
@@ -151,18 +187,21 @@ type spendSample struct {
 
 func NewGraph(wikiRoot, home string) *Graph {
 	return &Graph{
-		wikiRoot:    wikiRoot,
-		home:        home,
-		nodes:       map[string]*Node{},
-		edges:       map[string]bool{},
-		parent:      map[string]string{},
-		spawnByTool: map[string]spawnRec{},
-		spawnByName: map[string]spawnRec{},
-		childByTool: map[string]string{},
-		childByName: map[string]string{},
-		reportWait:  map[string]int64{},
-		knowSeen:    map[string]bool{},
-		taskState:   map[string]taskMark{},
+		wikiRoot:     wikiRoot,
+		home:         home,
+		nodes:        map[string]*Node{},
+		edges:        map[string]bool{},
+		parent:       map[string]string{},
+		spawnByTool:  map[string]spawnRec{},
+		childByTool:  map[string]string{},
+		spawnWait:    map[string][]spawnRec{},
+		childWait:    map[string][]string{},
+		reportWait:   map[string]int64{},
+		claimed:      map[string]bool{},
+		knowSeen:     map[string]bool{},
+		taskState:    map[string]taskMark{},
+		countedTurns: map[string]bool{},
+		now:          time.Now,
 	}
 }
 
@@ -194,16 +233,10 @@ func (g *Graph) Register(agentID string, m agentMeta) []any {
 		out = append(out, *n)
 	}
 
-	if m.ToolUseID != "" {
-		g.childByTool[m.ToolUseID] = agentID
-	}
-	if m.Name != "" {
-		g.childByName[m.Name] = agentID
-	}
-
-	rec, spawned := g.spawnFor(m)
+	rec, spawned := g.claimSpawn(agentID, m)
 	if _, linked := g.parent[agentID]; !linked {
-		from, ts := g.parentFor(agentID, m, rec, spawned)
+		from, ts, minted := g.parentFor(agentID, m, rec, spawned)
+		out = append(out, minted...)
 		out = append(out, g.link(from, agentID, ts)...)
 	}
 
@@ -220,34 +253,55 @@ func (g *Graph) Register(agentID string, m agentMeta) []any {
 	return out
 }
 
-// spawnFor finds the tool_use that created this agent, by id when the sidecar
-// records one and by name otherwise.
-func (g *Graph) spawnFor(m agentMeta) (spawnRec, bool) {
+// claimSpawn binds this agent to the tool_use that created it, permanently and
+// exclusively. A teammate sidecar carries no toolUseId, so name is the only
+// join key available — and a name is not unique across a run, so each spawn
+// record is claimed by exactly one agent, oldest first, and recorded by toolID
+// so nothing afterwards resolves through the shared name.
+func (g *Graph) claimSpawn(agentID string, m agentMeta) (spawnRec, bool) {
 	if m.ToolUseID != "" {
-		if rec, ok := g.spawnByTool[m.ToolUseID]; ok {
-			return rec, true
-		}
+		g.childByTool[m.ToolUseID] = agentID
+		rec, ok := g.spawnByTool[m.ToolUseID]
+		return rec, ok
 	}
-	if m.Name != "" {
-		if rec, ok := g.spawnByName[m.Name]; ok {
-			return rec, true
-		}
+	if m.Name == "" || g.claimed[agentID] {
+		return spawnRec{}, false
 	}
+	g.claimed[agentID] = true
+	if q := g.spawnWait[m.Name]; len(q) > 0 {
+		rec := q[0]
+		g.spawnWait[m.Name] = q[1:]
+		if rec.toolID != "" {
+			g.childByTool[rec.toolID] = agentID
+		}
+		return rec, true
+	}
+	g.childWait[m.Name] = append(g.childWait[m.Name], agentID)
 	return spawnRec{}, false
 }
 
-// parentFor prefers hard evidence (the spawning tool_use, or the sidecar's
-// parentAgentId) and falls back to the lead, which is where a top-level
-// teammate always belongs.
-func (g *Graph) parentFor(agentID string, m agentMeta, rec spawnRec, spawned bool) (string, int64) {
+// parentFor prefers hard evidence: the spawning tool_use, then the sidecar's
+// parentAgentId. With neither, only a sidecar that declares depth 0 justifies
+// the lead. Guessing otherwise parents a nested agent to the lead before its
+// real spawn is read, and the true edge then lands as a second one — the node
+// renders with two parents.
+func (g *Graph) parentFor(agentID string, m agentMeta, rec spawnRec, spawned bool) (string, int64, []any) {
 	if spawned {
-		return rec.from, rec.ts
+		return rec.from, rec.ts, nil
 	}
 	if m.ParentAgentID != "" && m.ParentAgentID != agentID {
-		g.node(m.ParentAgentID, RoleCrew, m.ParentAgentID)
-		return m.ParentAgentID, 0
+		var minted []any
+		// The parent's own transcript may not have been read yet, and a client
+		// given only the edge has no node to hang it on.
+		if p, created := g.node(m.ParentAgentID, RoleCrew, m.ParentAgentID); created {
+			minted = append(minted, *p)
+		}
+		return m.ParentAgentID, 0, minted
 	}
-	return LeadNodeID, 0
+	if m.SpawnDepth == 0 && (m.Name != "" || m.AgentType != "") {
+		return LeadNodeID, 0, nil
+	}
+	return "", 0, nil // no sidecar yet; a later Register or recordSpawn will link it
 }
 
 // Apply folds one event into the node that produced it.
@@ -267,17 +321,25 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 
 	ts := e.millis()
 	msg := e.decodeMessage()
-	n.Tokens += msg.Usage.billed()
 	if msg.Model != "" {
 		n.Model = msg.Model
 	}
-	if r, ok := rateFor(msg.Model, msg.Usage.Speed, ts); ok {
-		if spent := r.cost(msg.Usage); spent > 0 {
-			n.Cost += spent
-			g.spend = append(g.spend, spendSample{ts: ts, cost: spent})
+
+	// Usage is folded once per assistant turn. A turn spans several lines and
+	// each repeats the same usage object, so counting per line multiplies the
+	// bill by the number of blocks — measured at 2.6x on a real run. A turn
+	// with no id (older logs, user events) falls back to per-line, which is
+	// correct for those shapes.
+	if !g.usageCounted(msg.ID) {
+		n.Tokens += msg.Usage.billed()
+		if r, ok := rateFor(msg.Model, msg.Usage.Speed, ts); ok {
+			if spent := r.cost(msg.Usage); spent > 0 {
+				n.Cost += spent
+				g.spend = append(g.spend, spendSample{ts: ts, cost: spent})
+			}
+		} else {
+			n.Unpriced += msg.Usage.billed()
 		}
-	} else {
-		n.Unpriced += msg.Usage.billed()
 	}
 	if ts > n.TS {
 		n.TS = ts
@@ -339,7 +401,8 @@ func (g *Graph) Apply(nodeID string, e event) []any {
 }
 
 func (g *Graph) record(id, tool, detail string, ts int64) any {
-	a := Activity{Kind: "activity", ID: id, Tool: tool, Detail: detail, TS: ts}
+	g.activitySeq++
+	a := Activity{Kind: "activity", Seq: g.activitySeq, ID: id, Tool: tool, Detail: detail, TS: ts}
 	g.activity = append(g.activity, a)
 	if len(g.activity) > activityLimit {
 		g.activity = g.activity[len(g.activity)-activityLimit:]
@@ -405,9 +468,13 @@ func (g *Graph) runSummary() Run {
 		r.TasksTotal = r.TasksDone // a task created before the log we can see
 	}
 
-	// Burn over the trailing window only. Two samples are the minimum for a
-	// rate; below that the honest answer is "not yet known".
-	cutoff := g.latestTS - burnWindow
+	// Burn over the trailing window only, with both ends anchored to now: as a
+	// run idles the numerator loses samples while the denominator keeps growing,
+	// so the rate decays to zero instead of freezing. Two samples are still the
+	// minimum — one cost divided by the sliver of time since it landed is a
+	// spike, not a rate.
+	nowMS := g.now().UnixMilli()
+	cutoff := nowMS - burnWindow
 	kept, windowCost, earliest := g.spend[:0], 0.0, int64(0)
 	for _, s := range g.spend {
 		if s.ts < cutoff {
@@ -420,7 +487,7 @@ func (g *Graph) runSummary() Run {
 		}
 	}
 	g.spend = kept
-	if span := g.latestTS - earliest; span > 0 && windowCost > 0 {
+	if span := nowMS - earliest; len(kept) > 1 && span > 0 && windowCost > 0 {
 		r.BurnPerHour = windowCost / (float64(span) / 3_600_000)
 	}
 	return r
@@ -449,15 +516,24 @@ func (g *Graph) recordSpawn(from string, b contentBlock, ts int64) []any {
 	if b.ID != "" {
 		g.spawnByTool[b.ID] = rec
 	}
-	if in.Name != "" {
-		g.spawnByName[in.Name] = rec
-	}
 
-	child, ok := g.childByTool[b.ID]
+	child, ok := "", false
+	if b.ID != "" {
+		child, ok = g.childByTool[b.ID]
+	}
 	if !ok && in.Name != "" {
-		child, ok = g.childByName[in.Name]
+		if q := g.childWait[in.Name]; len(q) > 0 {
+			child, ok = q[0], true
+			g.childWait[in.Name] = q[1:]
+			if b.ID != "" {
+				g.childByTool[b.ID] = child
+			}
+		}
 	}
 	if !ok {
+		if in.Name != "" {
+			g.spawnWait[in.Name] = append(g.spawnWait[in.Name], rec)
+		}
 		return nil // the child's transcript has not appeared yet
 	}
 	return g.link(from, child, ts)
@@ -476,16 +552,11 @@ func (g *Graph) recordReport(toolUseID string, ts int64) []any {
 	return g.finish(child, ts)
 }
 
+// childFor resolves strictly by tool_use id. Falling back to the spawn's name
+// would hand this result to whichever agent registered under that name last.
 func (g *Graph) childFor(toolUseID string) (string, bool) {
-	if id, ok := g.childByTool[toolUseID]; ok {
-		return id, true
-	}
-	if rec, ok := g.spawnByTool[toolUseID]; ok && rec.name != "" {
-		if id, ok := g.childByName[rec.name]; ok {
-			return id, true
-		}
-	}
-	return "", false
+	id, ok := g.childByTool[toolUseID]
+	return id, ok
 }
 
 // finish marks a child done and draws the report edge back to its parent.
