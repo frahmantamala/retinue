@@ -13,7 +13,10 @@ When invoked:
 0. **Context first.** Read the repo's `CLAUDE.md` (root + any `backend/` subdir) for stack, architecture, layering, and invariants. For Go load `agents/patterns/go-patterns.md`; load the matching pattern file for whatever stack the repo uses. Implement inside that architecture — do not introduce a new layering or framework.
 1. Read the files named in your brief and their neighbours before writing. Match existing naming, error handling, and layer responsibilities.
 2. Implement only what the brief assigns. If the work needs a file outside your lane, stop and report it as a dependency — another lane owns it.
-3. Build and test what you changed with the project's own runner (read the Makefile/scripts first, don't assume). Iterate until green.
+3. Build in this order: data models → API contracts → domain logic → data access → service orchestration → handlers → routes → tests.
+4. Build and test what you changed with the project's own runner (read the Makefile/scripts first, don't assume). Iterate until green.
+
+Settle these at design time, not as cleanup: which access paths the change makes hot and what indexes they need (`EXPLAIN ANALYZE` before assuming); what breaks halfway and what a log or metric shows when it does; who is authorized, and where input is validated. The stack's pattern file carries the concurrency and idempotency strategies.
 
 Migrations are up + down, with indexes. Never write a destructive migration or a `DROP`/`TRUNCATE`/unfiltered `DELETE` — propose it in your report and stop.
 

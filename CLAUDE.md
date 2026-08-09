@@ -26,27 +26,29 @@ Approve? (I will not execute until confirmed)
 
 ---
 
-## SCOPE DISCIPLINE (ALL MODES)
+## SCOPE DISCIPLINE
 
-**Each mode MUST only change files within its scope. Do NOT touch files outside your mode's boundary.**
+**Each agent MUST only change files within its scope. Do NOT touch files outside your boundary.**
+Every agent below carries this table's row in its own persona — this is the shared copy.
 
-| Mode | CAN modify | CANNOT modify |
+| Agent | CAN modify | CANNOT modify |
 |------|-----------|---------------|
-| **SWE** | Backend code, DB migrations, API specs, backend tests | Frontend components, styles, stores, frontend tests |
-| **Frontend** | Components, styles, stores, composables/hooks, frontend tests | Backend code, DB migrations, API handlers |
-| **PM** | Documentation, specs, plans (`.md` files only) | Any source code |
-| **Designer** | Design specs, QA reports (`.md` files only) | Any source code |
-| **QA** | Test files only | Source code (report bugs, don't fix them) |
+| **`backend`** | Server code, DB migrations, API specs, backend tests, backend config | Components, styles, stores, composables/hooks, frontend tests |
+| **`frontend`** | Components, styles, stores, composables/hooks, client types, frontend tests | Server code, DB migrations, API handlers, backend tests |
+| **`pm`** | Stories, acceptance criteria, specs, plans (`.md` only) | Any source code |
+| **`test-writer`** | Test files only | Source code (report bugs, don't fix them) |
+| **`docs-writer`** | Documentation (`.md` only) | Any source code |
+| **`code-reviewer`**, **`pr-writer`** | Nothing — read-only | Everything; they report `file:line` |
 
 **Rules:**
-- If a task requires changes across boundaries (e.g. backend + frontend), complete one mode's work first, then switch modes for the rest
+- Work crossing a boundary is two lanes, not one. Finish the owning side first, or assign the rest to the agent that owns it
 - Read files from other domains for context, but never modify them
 - If you notice an issue outside your scope, flag it — don't fix it
-- Shared files (e.g. API types, config) should be modified in the mode that owns them. When unclear, ask which mode should own it
+- Shared files (e.g. API types, config) belong to whichever agent owns them. When unclear, ask before editing
 
 ---
 
-## COMMENT DISCIPLINE (ALL MODES)
+## COMMENT DISCIPLINE
 
 When writing code, comments must be **sparse and meaningful**:
 - Comment the **why**, not the **what** — never restate what the code already says.
@@ -56,7 +58,7 @@ When writing code, comments must be **sparse and meaningful**:
 
 ---
 
-## DURABLE CONTEXT — THE WIKI (ALL MODES)
+## DURABLE CONTEXT — THE WIKI
 
 The wiki is the compiled knowledge base: domain and business knowledge, and the decisions behind it.
 Unlike this file and the auto-memory, it does NOT load itself — so reach for it.
@@ -80,7 +82,7 @@ architecture (that's its own `CLAUDE.md`), or anything derivable from git histor
 ## MODEL TUNING — OPUS 5
 
 Opus 5 self-verifies, delegates, and elaborates more than prior models. These
-rules counteract that. They apply to every mode.
+rules counteract that. They apply everywhere — session and spawned agent alike.
 
 ### Output length
 
@@ -140,65 +142,30 @@ A template is available at `~/.claude/templates/project-claude.md`.
 
 ---
 
-## Multi-Agent Mode System
+## The Agents
 
-**A mode is not an agent.** A *mode* is loaded into the current session ("load swe") to steer the
-session I'm already in. An *agent* is spawned with its own context, tools, and model, and is
-registered by the `name`/`description`/`model`/`tools` frontmatter at the top of its file. The five
-`*-mode.md` files below have no frontmatter and are **not spawnable** — for delegated backend or
-frontend work, spawn the `backend` / `frontend` agents in `agents/` instead.
+An agent is spawned with its own context, tools, and model, registered by the
+`name`/`description`/`model`/`tools` frontmatter at the top of its file. There are seven, and
+between them they cover every lane a run needs:
 
-### Available Modes
+| Agent | Does | Owns |
+|-------|------|------|
+| **`pm`** | PRD breakdown, user stories (INVEST), acceptance criteria (Given-When-Then), dependencies, risks | `.md` only |
+| **`backend`** | API implementation, DB schema and migrations, architecture, performance, security | Backend paths |
+| **`frontend`** | Components, state management, SSR/CSR decisions, accessibility | Frontend paths |
+| **`test-writer`** | Test plans and automated tests against the ship criteria; reports bugs | Test files |
+| **`code-reviewer`** | Correctness, security, accessibility, visual constants, reuse, style | Nothing — reports |
+| **`docs-writer`** | Documentation kept in step with the code | `.md` only |
+| **`pr-writer`** | PR title and body from the branch diff | Nothing — drafts |
 
-1. **SWE Mode** - Backend/Architecture specialist
-2. **Frontend Mode** - UI/Frontend specialist
-3. **PM Mode** - Requirements Analysis
-4. **Designer Mode** - Design QA & Specs
-5. **QA Mode** - Testing & Quality
+Fall back to `general-purpose` only for a lane none of them covers.
 
-### How to Switch
+### Pattern files
 
-```
-"load swe"           # Backend work
-"load frontend"      # UI work
-"load pm"            # Planning work
-"load designer"      # Design review
-"load qa"            # Testing
-```
-
-Or explicitly: `"Switch to SWE mode"`, `"Switch to Frontend mode"`, etc.
-
-### Mode Files
-
-- SWE mode -> `.claude/agents/swe-mode.md`
-- Frontend mode -> `.claude/agents/frontend-mode.md`
-- PM mode -> `.claude/agents/pm-mode.md`
-- Designer mode -> `.claude/agents/designer-mode.md`
-- QA mode -> `.claude/agents/qa-mode.md`
-
-### Loading Patterns
-
-Stack-specific code patterns are loaded on demand:
-```
-"load go patterns"    # .claude/agents/patterns/go-patterns.md
-"load vue patterns"   # .claude/agents/patterns/vue-patterns.md
-```
-
-Create additional pattern files as needed (e.g. `react-patterns.md`, `node-patterns.md`).
-
----
-
-## Quick Mode Guide
-
-**SWE Mode** - API implementation, DB schema, architecture, performance, security. Planning-first approach.
-
-**Frontend Mode** - UI from Figma, components, state management, SSR/CSR decisions, accessibility.
-
-**PM Mode** - PRD breakdown, user stories (INVEST), acceptance criteria (Given-When-Then), dependency mapping.
-
-**Designer Mode** - Figma spec extraction, design QA, WCAG AA compliance, visual fidelity.
-
-**QA Mode** - Test plans, automated tests, bug reports, performance/security testing.
+Stack-specific code patterns live in `agents/patterns/` and are loaded on demand — `go-patterns.md`
+for the data layer, concurrency, and idempotency; `vue-patterns.md` for Vue/Nuxt structure, state,
+and SSR/CSR. An agent loads the one matching the repo's stack. Add more as needed
+(`react-patterns.md`, `node-patterns.md`).
 
 ---
 
@@ -207,26 +174,19 @@ Create additional pattern files as needed (e.g. `react-patterns.md`, `node-patte
 ```
 ~/.claude/
 ├── CLAUDE.md                        # This file (global guide)
-├── agents/
-│   ├── swe-mode.md                  # Backend principles
-│   ├── frontend-mode.md             # Frontend principles
-│   ├── pm-mode.md                   # PM mode
-│   ├── designer-mode.md             # Designer / UI-UX mode
-│   ├── qa-mode.md                   # QA mode
-│   ├── backend.md                   # spawnable agents (have frontmatter)
+├── agents/                          # every file here registers one spawnable agent
+│   ├── pm.md
+│   ├── backend.md
 │   ├── frontend.md
 │   ├── code-reviewer.md
 │   ├── test-writer.md
 │   ├── docs-writer.md
 │   ├── pr-writer.md
 │   └── patterns/
-│       ├── go-patterns.md           # Go code patterns
-│       └── vue-patterns.md          # Vue/Nuxt code patterns
+│       ├── go-patterns.md           # DB guidelines, Go concurrency & idempotency
+│       └── vue-patterns.md          # Vue/Nuxt patterns, layering, SSR/CSR criteria
 ├── templates/
 │   └── project-claude.md            # Per-project CLAUDE.md template
-└── figma/
-    ├── specs/                       # Design specs
-    └── screenshots/                 # Figma screenshots
 
 {project}/
 └── CLAUDE.md                        # Stack, architecture, conventions
@@ -238,7 +198,7 @@ Create additional pattern files as needed (e.g. `react-patterns.md`, `node-patte
 
 When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lead agent** follows these rules. Full reference: `~/.claude/TEAM-PLAYBOOK.md`.
 
-**Choosing the mode first.** Don't spawn a team for independent tasks (use Agent View) or for a single fix (just do it). Teams are for *dependent, multi-file* work only.
+**Choosing the shape first.** Don't spawn a team for independent tasks (use Agent View) or for a single fix (just do it). Teams are for *dependent, multi-file* work only.
 
 **Lead role — oversee, do not code.**
 - The lead does NOT write or edit source files — not features, not integration glue, not `main.go`
@@ -249,9 +209,9 @@ When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lea
 
 **Decomposition.**
 - Break the feature into one teammate per independent stream, plus a dedicated Review teammate.
-- Spawn the registered agent for the lane — `backend`, `frontend`, `test-writer`, `docs-writer`,
-  `code-reviewer`, `pr-writer`. They already carry their own scope boundary, so don't restate it in
-  the brief. `general-purpose` is the fallback for a lane none of them covers.
+- Spawn the registered agent for the lane — `pm`, `backend`, `frontend`, `test-writer`,
+  `docs-writer`, `code-reviewer`, `pr-writer`. They already carry their own scope boundary, so don't
+  restate it in the brief. `general-purpose` is the fallback for a lane none of them covers.
 - Map every teammate to concrete files/modules. No vague lanes.
 - State the contract between streams (API shape, types) up front so teammates don't diverge.
 
@@ -259,7 +219,7 @@ When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lea
 - Flag dependencies BEFORE dependent work starts (e.g. tests block on backend routes existing).
 - Coordinate through the shared task list; a teammate waiting on a dependency stays queued, not guessing.
 
-**Scope discipline (inherits the mode table above).**
+**Scope discipline (inherits the scope table above).**
 - Each teammate modifies only files in its lane (backend / frontend / tests / docs).
 - The Review teammate REPORTS issues with `file:line` — it never fixes them.
 - The lead merges a stream only after Review approves it.

@@ -1,7 +1,29 @@
 # Go Patterns Reference
 
-> Load this file when working on concurrency, worker pools, or idempotency.
-> From SWE mode: "load go patterns" or read `.claude/agents/patterns/go-patterns.md`
+> Load this file when working on the database layer, concurrency, worker pools, or idempotency.
+
+---
+
+## Database Guidelines
+
+House standard for the data layer, whatever the driver or query builder.
+
+### DO
+- Write properly indexed queries with parameterized values
+- Use single, composite, and partial indexes strategically
+- Use `EXPLAIN ANALYZE` on slow queries
+- Keep logic in application code (testable, version controlled)
+
+### DON'T
+- No stored procedures, views, or triggers
+- No ORM-generated queries for complex operations — write explicit queries
+
+```sql
+-- Index examples
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_transactions_user_date ON transactions(user_id, created_at);
+CREATE INDEX idx_active_users ON users(id) WHERE deleted_at IS NULL;
+```
 
 ---
 
@@ -289,6 +311,13 @@ func (wp *WorkerPool) Stop() {
 ## Idempotency (Prevent Double Payment/Booking)
 
 Idempotency ensures that multiple identical requests produce the same result.
+
+### Choosing a strategy
+
+Every mutating endpoint takes an idempotency key — that decision is not conditional. What varies is
+the locking underneath it: optimistic (version column) when conflicts are rare and a retry is cheap,
+pessimistic (`FOR UPDATE`) when losing the race corrupts money or state. A distributed lock only once
+more than one instance runs; it is the expensive option, not the default.
 
 ### Idempotency Key Pattern
 

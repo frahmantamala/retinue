@@ -160,7 +160,7 @@ no business being reachable off the machine.
 ```
 CLAUDE.md              global rules — safety, scope, comment discipline, model tuning
 TEAM-PLAYBOOK.md       the retinue contract: loop, supervision, merge gate, escalation
-agents/                9 subagent personas — 5 modes + review/test/docs/PR
+agents/                7 subagent personas — pm/backend/frontend + review/test/docs/PR
   patterns/            stack-specific code patterns, loaded on demand
 skills/                /run-team, /capture, /new-app, /rfc-drafter, /review-diff
 templates/             per-project CLAUDE.md template
@@ -172,9 +172,10 @@ settings.example.json  deny list, destructive-SQL hook, auto mode — deliberate
 install.sh             symlinks it all into ~/.claude, backing up what's there
 ```
 
-The five **modes** (SWE, Frontend, PM, Designer, QA) each declare what they may and may not modify.
-A frontend agent cannot touch migrations; a QA agent reports bugs and never fixes them. Scope
-boundaries stop parallel agents from quietly overwriting each other.
+There is one concept in `agents/` — the spawnable agent — and each of the seven declares what it may
+and may not modify. The frontend agent cannot touch migrations; the test writer reports bugs and
+never fixes them; the reviewer writes nothing at all. Scope boundaries stop parallel agents from
+quietly overwriting each other, which is the only thing making a lane count above two worth having.
 
 ## Install
 
@@ -235,7 +236,7 @@ The pieces are also useful on their own:
 | A pre-PR review of local changes | `/review-diff` |
 | A new project scaffolded to the house standard | `/new-app` |
 | This session's decisions written down | `/capture` |
-| A specialist framing for the work at hand | `load swe` · `load frontend` · `load pm` · `load designer` · `load qa` |
+| One lane done by a specialist | spawn `pm` · `backend` · `frontend` · `test-writer` · `docs-writer` · `code-reviewer` · `pr-writer` |
 
 **Single-threaded is a supported mode, not a failure.** A team is for *dependent, multi-file* work.
 Three independent tasks want Agent View (`claude agents`); one fix wants a plain session. Matching

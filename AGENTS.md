@@ -8,8 +8,8 @@ Both describe the same system — this one leaves out the Claude-specific plumbi
 1. **A supervision contract** — `TEAM-PLAYBOOK.md`, "The retinue contract". How a lead agent
    decomposes work, supervises a crew, verifies before merging, bounds its retries, and decides what
    it may do alone versus what stops the run.
-2. **Role definitions** — `agents/*.md`. Five modes (SWE, Frontend, PM, Designer, QA) plus review,
-   test, docs, and PR roles. Each declares what it may and may not modify.
+2. **Role definitions** — `agents/*.md`. Seven roles — requirements, backend, frontend, test, review,
+   docs, and PR. Each declares what it may and may not modify.
 3. **A knowledge-base schema** — `wiki/CLAUDE.md`. How to compile durable knowledge into linked
    markdown with typed edges and explicit supersession.
 
@@ -17,7 +17,7 @@ All three are plain markdown. Nothing here needs a runtime, an index, or a vecto
 
 ## Working rules
 
-- **Scope boundaries are binding.** A frontend role does not touch migrations. A QA role reports
+- **Scope boundaries are binding.** The frontend role does not touch migrations. The test role reports
   bugs and never fixes source. If work crosses a boundary, finish one side, then switch roles.
 - **Comments are sparse and meaningful.** Explain *why*, never restate the code. No narrative blocks.
 - **The lead does not write source.** It briefs, supervises, verifies, and gates. Gaps get assigned.

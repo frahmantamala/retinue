@@ -74,6 +74,10 @@ export function useUser() {
 
 ## Optimistic Update Composable
 
+Go optimistic when success is near-certain (>95%), the user needs instant feedback, and rollback is
+cheap — likes, toggles, reordering. Stay pessimistic when the operation can genuinely fail or rollback
+is complex: deletes, payments, form submissions.
+
 ```typescript
 // composables/useOptimisticUpdate.ts
 export function useOptimisticUpdate() {
@@ -146,6 +150,10 @@ const ChartComponent = defineAsyncComponent(() =>
 
 ## Nuxt Route Rules (SSR/CSR)
 
+SSR when the page is public and discovery matters — landing, blog/content, product pages (SEO, social
+sharing, fast FCP). CSR when the page is private and interactive — dashboards, admin panels,
+real-time views (no SEO value, complex client state).
+
 ```typescript
 // nuxt.config.ts
 export default defineNuxtConfig({
@@ -185,6 +193,22 @@ export default defineNuxtConfig({
   </div>
 </template>
 ```
+
+---
+
+## Separation of Concerns
+
+| Layer | Contains | Doesn't contain |
+|------|----------|-----------------|
+| **UI components** (`ui/`) | Props, events, styling, rendering | API calls, business logic |
+| **Feature components** (`features/`) | Composition, layout, event handling | Direct API calls — go through the logic layer |
+| **Logic layer** (composables/services) | Business logic, API calls, data fetching | UI rendering |
+| **State** (stores) | Global state, actions, derived state | UI logic, direct API calls |
+| **Utils** | Pure functions | State, API calls |
+
+Extract a child component when the logic is reused, needs its own tests, or the parent has outgrown
+roughly 100 lines. Keep it inline when it is used once and extracting would be abstraction for its
+own sake.
 
 ---
 

@@ -13,6 +13,8 @@ When invoked:
 2. Review for, in priority order:
    - **Correctness**: logic bugs, off-by-one, nil/undefined, error handling, race conditions.
    - **Security**: injection, missing authz/authn, secrets in code, unsafe deserialization, SSRF, path traversal.
+   - **Accessibility** (any UI code): WCAG AA — keyboard-operable, labelled controls, visible focus rings, semantic elements over a `div` with a handler, contrast ≥4.5:1 for text and ≥3:1 for UI elements and large text. Flag any state a component can reach but does not handle: default, hover, active, focus, disabled, loading, empty, error.
+   - **Visual constants** (any UI code): spacing on a 4px grid; interactive controls ≥44px tall (touch target); transitions 150–300ms; no horizontal scroll at mobile 320–767, tablet 768–1023, or desktop 1024+. A design explicitly overriding one of these is not a finding — an implementation drifting off them is.
    - **Reuse/simplification**: duplicated logic, dead code, needless complexity.
    - **Style**: only flag what violates the project's existing conventions (read neighbors first).
    - **Comments**: flag over-commenting — narrative blocks, banners, or comments that restate the code. Good comments explain *why*, are sparse, and meaningful.
@@ -23,3 +25,5 @@ Output format:
 - End with a one-line verdict: APPROVE / APPROVE WITH NITS / REQUEST CHANGES.
 
 Be specific and cite `file:line`. Do not invent issues to seem thorough — if it's clean, say so.
+
+When a design spec is in the brief, review against it too: colors, type, spacing, borders and shadows, component sizes, and every interaction state. Spacing and sizes carry a ±2px tolerance; past that it is a finding, reported as current vs expected.

@@ -27,7 +27,7 @@ flowchart TD
 |-----------|-----|-------------------|
 | Single prompt, single-file fix | Regular session | just prompt |
 | 3 independent tasks, no deps | Agent View | `claude agents` |
-| Repeatable workflow (review/test/docs/PR) | Subagent | delegate to `code-reviewer`, `test-writer`, `docs-writer`, `pr-writer` |
+| Repeatable workflow (specs/review/test/docs/PR) | Subagent | delegate to `pm`, `code-reviewer`, `test-writer`, `docs-writer`, `pr-writer` |
 | Multi-file feature with dependencies | Agent Teams | team prompt (below) + `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
 | Overnight backlog drain | Headless | `claude -p "..." --max-budget-usd N` |
 
@@ -66,12 +66,11 @@ Three traps:
 
 Set `worktree.symlinkDirectories: ["node_modules"]` so each worktree doesn't pay a fresh install.
 
-## Agents vs Skills vs Modes (don't confuse them)
+## Agents vs Skills (don't confuse them)
 
-- **Agent** = *who* does the work. A delegated context/persona with its own tools and model, spawned by the lead. Lives in `.claude/agents/<name>.md` **with `name`/`description`/`model`/`tools` frontmatter** — that frontmatter is what registers it as spawnable.
+- **Agent** = *who* does the work. A delegated context/persona with its own tools and model, spawned by the lead. Lives in `.claude/agents/<name>.md` **with `name`/`description`/`model`/`tools` frontmatter** — that frontmatter is what registers it as spawnable. Every file in `agents/` registers one; there is no second kind.
 - **Skill** = *a procedure* you run in the current session, invoked as `/<name>`. Lives in `.claude/skills/<name>/SKILL.md`. No separate context; it's instructions Claude follows inline.
-- **Mode** = *a framing loaded into the current session* ("load swe"), not a separate context. The five `*-mode.md` files have no frontmatter and are **not spawnable** — a lane that needs backend or frontend work spawns the `backend` / `frontend` agents instead. Modes stay long because you pay for them once per session; agent personas stay short because they are re-read on every turn the agent takes.
-- Rule of thumb: **reusable steps → Skill. Parallel/isolated work → Agent. Steering yourself → Mode.** A Skill can itself tell the lead to spawn agents (that's what `/run-team` does).
+- Rule of thumb: **reusable steps → Skill. Parallel or isolated work → Agent.** A Skill can itself tell the lead to spawn agents (that's what `/run-team` does).
 
 ## Team prompt template
 
@@ -92,6 +91,7 @@ Every lane maps to a registered agent — spawn that one, don't re-explain its s
 
 | Lane | Agent | Owns |
 |------|-------|------|
+| Requirements | `pm` | `.md` only — stories, acceptance criteria, risks (runs *before* lanes are cut) |
 | Backend | `backend` | server code, migrations, API contracts, backend tests |
 | Frontend | `frontend` | components, styles, stores, frontend tests |
 | Testing | `test-writer` | test files only |
