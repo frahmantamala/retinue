@@ -58,6 +58,31 @@ jobs:
             exit 1
           fi
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The run-loop diagram is duplicated on purpose — the README sells the loop,
+      # the playbook binds the lead to it — and nothing else keeps the copies equal.
+      - name: run-loop diagram stays in sync
+        run: |
+          python3 - <<'PY'
+          import re, sys
+
+          def run_loop(path):
+              blocks = re.findall(r'```mermaid\n(.*?)```', open(path).read(), re.S)
+              hits = [b for b in blocks if 'Load wiki + repo context' in b]
+              if len(hits) != 1:
+                  sys.exit(f'{path}: expected exactly 1 run-loop mermaid block, found {len(hits)}')
+              return hits[0]
+
+          a, b = 'README.md', 'TEAM-PLAYBOOK.md'
+          if run_loop(a) != run_loop(b):
+              sys.exit(f'{a} and {b} disagree on the run-loop diagram. It is duplicated '
+                       'deliberately and must be kept identical — apply the edit to both.')
+          PY
+
   shell:
     runs-on: ubuntu-latest
     steps:

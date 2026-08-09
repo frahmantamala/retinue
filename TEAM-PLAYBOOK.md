@@ -21,7 +21,7 @@ flowchart TD
 | **2 — Agent View** | Dashboard of independent background sessions (`claude agents`) | No | **Yes** | 3–10 independent tasks, dispatch & collect |
 | **3 — Agent Teams** | One lead coordinates teammates over a shared task list | **Yes** | Yes | Dependent, multi-file features |
 
-## Decision framework (Step 6)
+## Decision framework
 
 | Situation | Use | Command / trigger |
 |-----------|-----|-------------------|
@@ -114,8 +114,8 @@ the escalation rules below. It does not ask permission to start.
 ```mermaid
 flowchart TD
     L[Load wiki + repo context] --> Z["Baseline — record what is already red"]
-    Z --> D[Decompose lanes + state contract] --> B[Brief teammates<br/>inject settled decisions]
-    B --> W[Teammates work in parallel]
+    Z --> D[Decompose lanes + state contract] --> B[Brief crew<br/>inject settled decisions]
+    B --> W[Crew works in parallel]
     W --> M{"Monitor — no report or diverging?"}
     M -->|re-brief / reassign| W
     M -->|lane reports| V["Lead verifies that lane — build, test, curl"]
@@ -133,11 +133,13 @@ flowchart TD
 
 ### Supervision (the lead's actual job while agents run)
 
-- **Poll the task list.** Between reports the lead sees no teammate output; what it *can* read is
-  `TaskList` — status and owner, no timestamps. A task `in_progress` whose owner has produced no
-  report across two consecutive polls gets a `SendMessage` status ping — that is how a lead reaches a
-  teammate — then a re-brief or reassign, same as for one that wandered out of lane. `retinue watch`
-  is the human's view; nothing in the loop waits on someone reading it.
+- **Read the task list on every report.** Between reports the lead is not running and has no clock,
+  so supervision is paced by the one thing that wakes it: a teammate reporting. Each time any
+  teammate reports, read `TaskList` — status and owner, no timestamps. A task still `in_progress`
+  whose owner has produced nothing across two *other* teammates' reports gets a `SendMessage` status
+  ping — that is how a lead reaches a teammate — then a re-brief or reassign, same as for one that
+  wandered out of lane. `retinue watch` is the human's view; nothing in the loop waits on someone
+  reading it.
 - **Spend against the cap, not into it.** No subcommand reports run cost, so this one is the human's
   call from `retinue watch` and the lead acts on being told: at 70% of `--max-budget-usd` with lanes
   still open, stop spawning — no new lanes, no replacement agents — and drive the open lanes to a
