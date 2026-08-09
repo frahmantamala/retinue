@@ -109,6 +109,9 @@ func runWatch(args []string) error {
 	}
 
 	log.Printf("session %s (%s)", sess.ID, sess.Repo)
+	if sess.Selection != "" {
+		log.Printf("selected  %s", sess.Selection)
+	}
 	log.Printf("watching  http://%s", addr)
 
 	go func() {

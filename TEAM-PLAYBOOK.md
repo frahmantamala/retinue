@@ -66,11 +66,12 @@ Three traps:
 
 Set `worktree.symlinkDirectories: ["node_modules"]` so each worktree doesn't pay a fresh install.
 
-## Agents vs Skills (don't confuse them)
+## Agents vs Skills vs Modes (don't confuse them)
 
-- **Agent** = *who* does the work. A delegated context/persona with its own tools and model. Lives in `.claude/agents/<name>.md`. The lead spawns these.
+- **Agent** = *who* does the work. A delegated context/persona with its own tools and model, spawned by the lead. Lives in `.claude/agents/<name>.md` **with `name`/`description`/`model`/`tools` frontmatter** — that frontmatter is what registers it as spawnable.
 - **Skill** = *a procedure* you run in the current session, invoked as `/<name>`. Lives in `.claude/skills/<name>/SKILL.md`. No separate context; it's instructions Claude follows inline.
-- Rule of thumb: **reusable steps → Skill. Parallel/isolated work → Agent.** A Skill can itself tell the lead to spawn agents (that's what `/run-team` does).
+- **Mode** = *a framing loaded into the current session* ("load swe"), not a separate context. The five `*-mode.md` files have no frontmatter and are **not spawnable** — a lane that needs backend or frontend work spawns the `backend` / `frontend` agents instead. Modes stay long because you pay for them once per session; agent personas stay short because they are re-read on every turn the agent takes.
+- Rule of thumb: **reusable steps → Skill. Parallel/isolated work → Agent. Steering yourself → Mode.** A Skill can itself tell the lead to spawn agents (that's what `/run-team` does).
 
 ## Team prompt template
 
@@ -86,6 +87,19 @@ Spawn separate agents:
 Each agent works in its own context. Coordinate through the shared task list.
 Flag dependencies BEFORE starting dependent tasks.
 ```
+
+Every lane maps to a registered agent — spawn that one, don't re-explain its scope in the brief:
+
+| Lane | Agent | Owns |
+|------|-------|------|
+| Backend | `backend` | server code, migrations, API contracts, backend tests |
+| Frontend | `frontend` | components, styles, stores, frontend tests |
+| Testing | `test-writer` | test files only |
+| Docs | `docs-writer` | `.md` only |
+| Review | `code-reviewer` | nothing — reports `file:line` |
+| PR | `pr-writer` | nothing — drafts title/body |
+
+Fall back to `general-purpose` only for a lane none of these covers.
 
 ## The retinue contract — an autonomous lead
 

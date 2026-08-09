@@ -1,13 +1,16 @@
 package watch
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // LeadNodeID is the graph id of the session that owns the run. Crew nodes use
@@ -23,6 +26,11 @@ type Session struct {
 	LeadPath    string
 	SubagentDir string
 	LeadLabel   string
+
+	// Selection explains an automatic pick, and is empty when the caller named
+	// the session. Attaching to the wrong transcript is otherwise indefensible
+	// from the outside: the id alone does not say a near-tie existed.
+	Selection string
 }
 
 // agentMeta is the sidecar written next to each subagent transcript. It is the
@@ -70,14 +78,14 @@ func Discover(home, repo, id string) (Session, error) {
 		return Session{}, fmt.Errorf("no transcripts for %s (looked in %s)", abs, dir)
 	}
 
-	var lead string
+	var lead, selection string
 	if id != "" {
 		lead = filepath.Join(dir, id+".jsonl")
 		if _, err := os.Stat(lead); err != nil {
 			return Session{}, fmt.Errorf("no session %s in %s", id, dir)
 		}
 	} else {
-		lead, err = newestTranscript(dir)
+		lead, selection, err = newestTranscript(dir)
 		if err != nil {
 			return Session{}, err
 		}
@@ -90,6 +98,7 @@ func Discover(home, repo, id string) (Session, error) {
 		LeadPath:    lead,
 		SubagentDir: filepath.Join(strings.TrimSuffix(lead, ".jsonl"), "subagents"),
 		LeadLabel:   "lead",
+		Selection:   selection,
 	}
 	if name := teamLeadName(home, s.ID); name != "" {
 		s.LeadLabel = name
@@ -97,14 +106,34 @@ func Discover(home, repo, id string) (Session, error) {
 	return s, nil
 }
 
-func newestTranscript(dir string) (string, error) {
+// tieWindow is how close two modification times have to be before they stop
+// carrying information. Mtimes are nanosecond-precise, so a dormant session
+// appending one line can out-rank the session the user is watching by a margin
+// that means nothing; inside the window, content decides instead.
+const tieWindow = time.Second
+
+// tailBytes caps the read used to date a transcript. Transcripts reach
+// megabytes, so only the end is read — and only for the handful of files that
+// tied, which is usually none.
+const tailBytes = 64 << 10
+
+type candidate struct {
+	path string
+	name string
+	mod  time.Time
+	size int64
+	last int64 // last event's Unix milli, 0 when the tail yields no timestamp
+}
+
+// newestTranscript picks the transcript to attach to and explains the pick.
+// Modification time ranks first, but only outside tieWindow: within it the
+// files are treated as equally recent and resolved by their newest event, then
+// by size, then by name. Every tiebreak is a property of the files themselves,
+// so the result never depends on readdir or map order.
+func newestTranscript(dir string) (string, string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return "", err
-	}
-	type candidate struct {
-		path string
-		mod  int64
+		return "", "", err
 	}
 	var found []candidate
 	for _, e := range entries {
@@ -115,13 +144,104 @@ func newestTranscript(dir string) (string, error) {
 		if err != nil {
 			continue
 		}
-		found = append(found, candidate{filepath.Join(dir, e.Name()), info.ModTime().UnixNano()})
+		found = append(found, candidate{
+			path: filepath.Join(dir, e.Name()),
+			name: e.Name(),
+			mod:  info.ModTime(),
+			size: info.Size(),
+		})
 	}
 	if len(found) == 0 {
-		return "", errors.New("no session transcripts found")
+		return "", "", errors.New("no session transcripts found")
 	}
-	sort.Slice(found, func(i, j int) bool { return found[i].mod > found[j].mod })
-	return found[0].path, nil
+
+	sort.Slice(found, func(i, j int) bool {
+		if !found[i].mod.Equal(found[j].mod) {
+			return found[i].mod.After(found[j].mod)
+		}
+		return found[i].name < found[j].name
+	})
+
+	n := 1
+	for n < len(found) && found[0].mod.Sub(found[n].mod) < tieWindow {
+		n++
+	}
+	tied := found[:n]
+	if len(tied) > 1 {
+		for i := range tied {
+			tied[i].last = lastEventMillis(tied[i].path)
+		}
+		sort.Slice(tied, func(i, j int) bool {
+			a, b := tied[i], tied[j]
+			switch {
+			case a.last != b.last:
+				return a.last > b.last
+			case a.size != b.size:
+				return a.size > b.size
+			default:
+				return a.name < b.name
+			}
+		})
+	}
+	return tied[0].path, selectionReason(len(found), tied), nil
+}
+
+func selectionReason(total int, tied []candidate) string {
+	if total == 1 {
+		return "only transcript in the project directory"
+	}
+	if len(tied) == 1 {
+		return fmt.Sprintf("newest of %d transcripts", total)
+	}
+	when := "no timestamp"
+	if tied[0].last > 0 {
+		when = time.UnixMilli(tied[0].last).Format(time.RFC3339)
+	}
+	return fmt.Sprintf("newest of %d transcripts; %d modified within %s of each other, "+
+		"chose the most recently active (last event %s, %d bytes)",
+		total, len(tied), tieWindow, when, tied[0].size)
+}
+
+// lastEventMillis dates a transcript by its final usable event. It reads only
+// the tail, and returns 0 rather than an error for anything unreadable — a
+// missing date demotes the file, it does not fail the whole selection.
+func lastEventMillis(path string) int64 {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return 0
+	}
+	off := info.Size() - tailBytes
+	if off < 0 {
+		off = 0
+	}
+	buf := make([]byte, info.Size()-off)
+	if _, err := f.ReadAt(buf, off); err != nil && !errors.Is(err, io.EOF) {
+		return 0
+	}
+
+	lines := bytes.Split(buf, []byte("\n"))
+	if off > 0 {
+		lines = lines[1:] // the window opened mid-record
+	}
+	// Backwards: the final line is often a partial append on a live session.
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := bytes.TrimSpace(lines[i])
+		if len(line) == 0 {
+			continue
+		}
+		if e, ok := decodeEvent(line); ok {
+			if ms := e.millis(); ms > 0 {
+				return ms
+			}
+		}
+	}
+	return 0
 }
 
 // teamLeadName reads the team config for a nicer lead label. The config keys

@@ -142,6 +142,12 @@ A template is available at `~/.claude/templates/project-claude.md`.
 
 ## Multi-Agent Mode System
 
+**A mode is not an agent.** A *mode* is loaded into the current session ("load swe") to steer the
+session I'm already in. An *agent* is spawned with its own context, tools, and model, and is
+registered by the `name`/`description`/`model`/`tools` frontmatter at the top of its file. The five
+`*-mode.md` files below have no frontmatter and are **not spawnable** — for delegated backend or
+frontend work, spawn the `backend` / `frontend` agents in `agents/` instead.
+
 ### Available Modes
 
 1. **SWE Mode** - Backend/Architecture specialist
@@ -207,6 +213,12 @@ Create additional pattern files as needed (e.g. `react-patterns.md`, `node-patte
 │   ├── pm-mode.md                   # PM mode
 │   ├── designer-mode.md             # Designer / UI-UX mode
 │   ├── qa-mode.md                   # QA mode
+│   ├── backend.md                   # spawnable agents (have frontmatter)
+│   ├── frontend.md
+│   ├── code-reviewer.md
+│   ├── test-writer.md
+│   ├── docs-writer.md
+│   ├── pr-writer.md
 │   └── patterns/
 │       ├── go-patterns.md           # Go code patterns
 │       └── vue-patterns.md          # Vue/Nuxt code patterns
@@ -237,6 +249,9 @@ When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lea
 
 **Decomposition.**
 - Break the feature into one teammate per independent stream, plus a dedicated Review teammate.
+- Spawn the registered agent for the lane — `backend`, `frontend`, `test-writer`, `docs-writer`,
+  `code-reviewer`, `pr-writer`. They already carry their own scope boundary, so don't restate it in
+  the brief. `general-purpose` is the fallback for a lane none of them covers.
 - Map every teammate to concrete files/modules. No vague lanes.
 - State the contract between streams (API shape, types) up front so teammates don't diverge.
 
