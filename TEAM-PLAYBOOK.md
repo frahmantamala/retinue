@@ -81,9 +81,9 @@ Spawn separate agents:
 1. [Role 1]: [specific task with files/modules]
 2. [Role 2]: [specific task with files/modules]
 3. [Role 3]: [specific task with files/modules]
-4. Review: review all code for [bugs/security/style]
 
-Each agent works in its own context. Coordinate through the shared task list.
+Gate each stream with a fresh code-reviewer as it lands, and one over the combined
+diff at the end. Each agent works in its own context. Coordinate through the shared task list.
 Flag dependencies BEFORE starting dependent tasks.
 ```
 
@@ -91,13 +91,13 @@ Every lane maps to a registered agent — spawn that one, don't re-explain its s
 
 | Lane | Agent | Owns |
 |------|-------|------|
-| Requirements | `pm` | `.md` only — stories, acceptance criteria, risks (runs *before* lanes are cut) |
+| Requirements | `pm` | `.md` only — stories, acceptance criteria, risks (runs *first and alone*, before lanes are cut — not a lane) |
 | Backend | `backend` | server code, migrations, API contracts, backend tests |
 | Frontend | `frontend` | components, styles, stores, frontend tests |
 | Testing | `test-writer` | test files only |
 | Docs | `docs-writer` | `.md` only |
-| Review | `code-reviewer` | nothing — reports `file:line` |
-| PR | `pr-writer` | nothing — drafts title/body |
+| Review | `code-reviewer` | nothing — reports `file:line` (spawned fresh per stream at gate time, not a standing lane) |
+| PR | `pr-writer` | nothing — drafts title/body (spawned after the tree is green, not a standing lane) |
 
 Fall back to `general-purpose` only for a lane none of these covers.
 
@@ -113,23 +113,35 @@ the escalation rules below. It does not ask permission to start.
 
 ```mermaid
 flowchart TD
-    L[Load wiki + repo context] --> D[Decompose lanes + state contract]
-    D --> B[Brief teammates<br/>inject settled decisions]
+    L[Load wiki + repo context] --> Z["Baseline — record what is already red"]
+    Z --> D[Decompose lanes + state contract] --> B[Brief teammates<br/>inject settled decisions]
     B --> W[Teammates work in parallel]
-    W --> M{"Monitor — stuck or diverging?"}
+    W --> M{"Monitor — no report or diverging?"}
     M -->|re-brief / reassign| W
-    M -->|healthy| V["Lead verifies — build, test, curl"]
-    V --> G{"Merge gate — green AND Review approved?"}
+    M -->|lane reports| V["Lead verifies that lane — build, test, curl"]
+    V --> G{"Lane gate — no new failures AND Review approved?"}
     G -->|no — cycle 1 or 2| F[Assign fix] --> W
     G -->|no — cycle 3| E[Escalate]
-    G -->|yes| C[Capture decisions to wiki]
-    C --> R[Report once]
+    G -->|yes| K[Commit the lane]
+    K -->|lanes still open| W
+    K -->|last lane closed| I["Integration verify + review"]
+    I --> J{"Integration gate — cross-lane bug?"} -->|yes — cycle 1 or 2| F
+    J -->|yes — cycle 3| E
+    J -->|no| C[Capture decisions to wiki] --> R[Report once]
+    E --> C
 ```
 
 ### Supervision (the lead's actual job while agents run)
 
-- **Watch, don't wait.** Poll teammate progress. An agent that has stopped making progress, wandered
-  outside its lane, or started rewriting another lane's files gets re-briefed or reassigned — not left running.
+- **Poll the task list.** Between reports the lead sees no teammate output; what it *can* read is
+  `TaskList` — status and owner, no timestamps. A task `in_progress` whose owner has produced no
+  report across two consecutive polls gets a `SendMessage` status ping — that is how a lead reaches a
+  teammate — then a re-brief or reassign, same as for one that wandered out of lane. `retinue watch`
+  is the human's view; nothing in the loop waits on someone reading it.
+- **Spend against the cap, not into it.** No subcommand reports run cost, so this one is the human's
+  call from `retinue watch` and the lead acts on being told: at 70% of `--max-budget-usd` with lanes
+  still open, stop spawning — no new lanes, no replacement agents — and drive the open lanes to a
+  gate. Lane cost spreads several-fold on real runs; one runaway lane starves the ones behind it.
 - **The lead writes no source.** Not features, not glue, not `main.go` wiring, not the last bug fix.
   A remaining gap gets an agent assigned to it.
 - **Verify, don't trust.** An agent reporting success is a claim. The lead runs the build, the tests,
@@ -137,13 +149,27 @@ flowchart TD
 
 ### The merge gate
 
-A stream merges only when **the build is green AND the Review lane has approved it**. Review reports
-`file:line` and never fixes. The lead never merges on a teammate's say-so.
+Lanes share one tree (see *Where the work happens*), so a teammate's work is in the working files the
+moment it reports — there is nothing to withhold. "Merge" is therefore something the lead *does*: **a
+commit**. Teammates run no `git` state commands; the lead owns the tree.
+
+A lane gates on *no new failures against the baseline* — build and suite run before anything spawned
+— AND approval from a `code-reviewer` spawned fresh for it. The lead then stages that lane's paths
+(`git add -- <paths>`; a lane's new files are untracked and `git commit -- <path>` would reject them)
+and commits them — **never `-a`, never a bare `git commit`**, which in a shared tree sweeps a
+neighbour's half-finished work into the record and destroys the `git revert` boundary the gate exists
+for. Gate each lane as it reports, not after the crew finishes; when the last lane commits, one
+integration reviewer reads the combined diff and the lead re-runs the full suite — that review gates
+too, its findings going back to the owning lane under the same bound. Review reports `file:line` and
+never fixes.
 
 ### Bounded fix cycles
 
 A failed gate sends work back with a specific fix assignment. **Maximum two cycles on the same
-finding.** A third attempt is thrash, not persistence — escalate instead. Track cycles per finding, not per run.
+finding** — tracked per finding, not per run, and keyed on normalised `file:line` + category from the
+reviewer's report, or the same bug reworded reads as new and the bound leaks silently. A third
+attempt is thrash, not persistence: escalate, and capture before reporting — the run that thrashed is
+the run that learned the most.
 
 ### What the lead may decide
 

@@ -18,28 +18,41 @@ on **a compiled wiki it reads at the start of a run and writes back to at the en
 
 ```mermaid
 flowchart TD
-    L[Load wiki + repo context] --> D[Decompose lanes + state contract]
-    D --> B[Brief crew<br/>inject settled decisions]
+    L[Load wiki + repo context] --> Z["Baseline — record what is already red"]
+    Z --> D[Decompose lanes + state contract] --> B[Brief crew<br/>inject settled decisions]
     B --> W[Crew works in parallel]
-    W --> M{"Monitor — stuck or diverging?"}
+    W --> M{"Monitor — no report or diverging?"}
     M -->|re-brief / reassign| W
-    M -->|healthy| V["Lead verifies — build, test, curl"]
-    V --> G{"Merge gate — green AND Review approved?"}
+    M -->|lane reports| V["Lead verifies that lane — build, test, curl"]
+    V --> G{"Lane gate — no new failures AND Review approved?"}
     G -->|no — cycle 1 or 2| F[Assign fix] --> W
     G -->|no — cycle 3| E[Escalate]
-    G -->|yes| C[Capture decisions to wiki]
-    C --> R[Report once]
+    G -->|yes| K[Commit the lane]
+    K -->|lanes still open| W
+    K -->|last lane closed| I["Integration verify + review"]
+    I --> J{"Integration gate — cross-lane bug?"} -->|yes — cycle 1 or 2| F
+    J -->|yes — cycle 3| E
+    J -->|no| C[Capture decisions to wiki] --> R[Report once]
+    E --> C
 ```
 
-The loop has two exits, and both matter more than the happy path.
+What matters in that loop is not the happy path.
 
-**The fix cycle is bounded.** A failed merge gate sends work back with a specific assignment — at
-most twice for the same finding. A third attempt is thrash, not persistence, so it escalates
-instead. Unbounded retry is how autonomous runs burn a night and a budget on one bug.
+**The gate is per lane, and merging is a commit.** The crew works in one tree, so a lane that has
+"finished" is already in the working files — there is nothing to withhold. The lead commits each
+approved lane as one commit, which is what makes a rejection a `git revert` instead of an argument;
+teammates run no `git` state commands at all. A fast lane gates while a slow one is still working,
+and the integration verify after the last lane closes gates too — a cross-lane bug returns to its lane.
+
+**The fix cycle is bounded.** A failed gate sends work back with a specific assignment — at most
+twice for the same finding, counted on normalised `file:line` + category so a reworded bug is not a
+fresh one. A third attempt is thrash, not persistence, so it escalates — and escalation still
+captures, because the run that thrashed is the run that learned the most.
 
 **The lead verifies rather than trusts.** An agent reporting success is a claim. The lead runs the
-build, the tests, and the endpoint itself before merging anything, and it writes no source code —
-gaps get assigned to a crew member, never patched by the supervisor.
+build, the tests, and the endpoint itself, judged against a baseline taken before any lane spawned
+so a suite that was already red is not charged to the crew. It writes no source code — gaps get
+assigned to a crew member, never patched by the supervisor.
 
 ## What the lead may decide
 
