@@ -30,6 +30,27 @@ backup_and_link() {
   echo "linked $dst"
 }
 
+# Linking alone never notices a deletion: an entry dropped from the repo leaves a
+# dangling link the runner still tries to load. Only our own dead links go —
+# real files, real dirs and links pointing elsewhere are the user's, not ours.
+prune_stale_links() {
+  local dir="$1" entry target rel
+  [ -d "$dir" ] || return 0
+  for entry in "$dir"/*; do
+    [ -L "$entry" ] || continue
+    [ -e "$entry" ] && continue
+    target="$(readlink "$entry")"
+    case "$target" in
+      "$REPO"/*) ;;
+      *) continue ;;
+    esac
+    rel="${entry#/}"; rel="${rel//\//_}"
+    cp -a "$entry" "$BAK/$rel"
+    rm "$entry"
+    echo "pruned $entry"
+  done
+}
+
 for f in CLAUDE.md TEAM-PLAYBOOK.md; do
   backup_and_link "$REPO/$f" "$DEST/$f"
 done
@@ -41,6 +62,7 @@ for dir in agents skills templates; do
     [ -e "$entry" ] || continue
     backup_and_link "$entry" "$DEST/$dir/$(basename "$entry")"
   done
+  prune_stale_links "$DEST/$dir"
 done
 
 # The wiki: schema only. Pages are yours and are never touched.
@@ -48,6 +70,7 @@ if [ -d "$WIKI" ]; then
   mkdir -p "$WIKI/.claude"
   backup_and_link "$REPO/wiki/CLAUDE.md" "$WIKI/CLAUDE.md"
   backup_and_link "$REPO/wiki/commands" "$WIKI/.claude/commands"
+  prune_stale_links "$WIKI/.claude"
 else
   echo "note: no wiki at $WIKI — mkdir it and re-run, or set RETINUE_WIKI"
 fi
