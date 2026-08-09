@@ -133,13 +133,21 @@ flowchart TD
 
 ### Supervision (the lead's actual job while agents run)
 
+- **The lead owns task state, end to end.** Open one task per lane as you spawn it, owner set to that
+  lane's teammate, and close it at that lane's merge gate — not when the teammate says it is done. No
+  teammate touches this list: no persona carries task tools, so a brief telling one to update its own
+  task asks for something it cannot do. Nothing else writes the list either, and both readers of it —
+  the ping rule below and `retinue watch`'s progress panel — go dead if the lead skips the open step.
 - **Read the task list on every report.** Between reports the lead is not running and has no clock,
   so supervision is paced by the one thing that wakes it: a teammate reporting. Each time any
   teammate reports, read `TaskList` — status and owner, no timestamps. A task still `in_progress`
   whose owner has produced nothing across two *other* teammates' reports gets a `SendMessage` status
   ping — that is how a lead reaches a teammate — then a re-brief or reassign, same as for one that
-  wandered out of lane. `retinue watch` is the human's view; nothing in the loop waits on someone
-  reading it.
+  wandered out of lane. That count needs other lanes still reporting, so the rule stops covering the
+  last one: ping it when you commit the second-to-last lane, which is the lead's final guaranteed
+  wake point. If the last lane then goes silent the lead is not executing and cannot detect it — the
+  human watching `retinue watch` is the only detector left, and `--max-budget-usd` is what ends a
+  hung unattended run.
 - **Spend against the cap, not into it.** No subcommand reports run cost, so this one is the human's
   call from `retinue watch` and the lead acts on being told: at 70% of `--max-budget-usd` with lanes
   still open, stop spawning — no new lanes, no replacement agents — and drive the open lanes to a
@@ -160,10 +168,12 @@ A lane gates on *no new failures against the baseline* — build and suite run b
 (`git add -- <paths>`; a lane's new files are untracked and `git commit -- <path>` would reject them)
 and commits them — **never `-a`, never a bare `git commit`**, which in a shared tree sweeps a
 neighbour's half-finished work into the record and destroys the `git revert` boundary the gate exists
-for. Gate each lane as it reports, not after the crew finishes; when the last lane commits, one
-integration reviewer reads the combined diff and the lead re-runs the full suite — that review gates
-too, its findings going back to the owning lane under the same bound. Review reports `file:line` and
-never fixes.
+for. Closing that lane's task belongs to this commit rather than to the teammate's report: until the
+commit lands, the lane is still work in flight, and the task is what the ping rule and the monitor's
+progress panel read. Gate each lane as it reports, not after the crew finishes; when the last lane
+commits, one integration reviewer reads the combined diff and the lead re-runs the full suite — that
+review gates too, its findings going back to the owning lane under the same bound. Review reports
+`file:line` and never fixes.
 
 ### Bounded fix cycles
 
@@ -180,7 +190,7 @@ the run that learned the most.
 | Naming, file layout, test structure | Architecture inside the stated scope | `DROP` / `TRUNCATE` / `DELETE` without `WHERE` |
 | Rejecting agent work, re-briefing, reassigning | Contract changes between lanes | Destructive migrations |
 | Non-destructive refactors | Trade-offs it had to resolve | Deleting files it did not create |
-| Retrying a failed agent | Anything a future run should inherit | Scope growth · 3rd fix cycle · budget cap hit |
+| Retrying a failed agent | Anything a future run should inherit | Scope growth · 3rd fix cycle |
 
 The right-hand column is not advisory. It goes into **every teammate brief**, because
 `defaultMode` is `acceptEdits` and teammates inherit it — an unattended run means agents editing

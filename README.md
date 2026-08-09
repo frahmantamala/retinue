@@ -64,7 +64,7 @@ unattended process with file-write access.
 | Naming, file layout, test structure | Architecture inside the stated scope | `DROP` / `TRUNCATE` / `DELETE` without `WHERE` |
 | Rejecting work, re-briefing, reassigning | Contract changes between lanes | Destructive migrations |
 | Non-destructive refactors | Trade-offs it had to resolve | Deleting files it did not create |
-| Retrying a failed agent | Anything a future run should inherit | Scope growth · 3rd fix cycle · budget cap |
+| Retrying a failed agent | Anything a future run should inherit | Scope growth · 3rd fix cycle |
 
 The right-hand column goes into **every crew brief**, not just the playbook — a subagent is not
 bound by a document it never read.
@@ -133,11 +133,11 @@ burn      $74.67 / hr
 budget    $22.64 left — 18m
 ```
 
-Progress comes from the lead's own shared task list (`TaskCreate` / `TaskUpdate` in the transcript),
-not from guesswork. Burn is measured over a trailing ten-minute window rather than the run's
-lifetime — that run averaged $40/hr but was burning $75/hr at the end, when the most lanes were
-running at once, and a lifetime average would have told you the comfortable number instead of the
-true one. Pass `--budget-usd` to get the time-to-exhaustion line.
+Progress comes from the lead's own shared task list (`TaskCreate` / `TaskUpdate` in the transcript) —
+one task per lane, opened at spawn and closed at that lane's merge gate — not from guesswork. Burn is
+measured over a trailing ten-minute window rather than the run's lifetime — that run averaged $40/hr
+but was burning $75/hr at the end, when the most lanes were running at once, and a lifetime average
+would have told you the comfortable number instead of the true one. Pass `--budget-usd` to get the time-to-exhaustion line.
 
 The time-remaining estimate extrapolates elapsed-per-completed-task, so it is a rough read and the
 UI says so: lanes are not equal size. There is no "percent of your plan used" — your account's token
