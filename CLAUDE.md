@@ -97,7 +97,8 @@ rules counteract that. They apply everywhere — session and spawned agent alike
 - Do NOT add a "verify your work" step to prompts or harnesses. Verification is
   already in the main loop; asking for it causes redundant work, not accuracy.
 - Do NOT spawn a subagent to review or double-check. Verify inline.
-- Exception: the Review teammate in an agent team is a real lane, not scaffolding.
+- Exception: an agent team's `code-reviewer` gate is a real check, not scaffolding — spawn one fresh
+  per stream and one over the combined diff.
 
 ### Subagent delegation
 
@@ -196,35 +197,33 @@ and SSR/CSR. An agent loads the one matching the repo's stack. Add more as neede
 
 ## Agent Team Coordination (Level 3)
 
-When running an agent team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), the **lead agent** follows these rules. Full reference: `~/.claude/TEAM-PLAYBOOK.md`.
+Teams (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) are for dependent, multi-file work only —
+independent tasks go to Agent View, a single fix is just a session. The **lead** follows
+`~/.claude/TEAM-PLAYBOOK.md`, authoritative on lanes, gating, escalation, and the wiki bookends.
+Below is only what a lead must not get wrong before opening it.
 
-**Choosing the shape first.** Don't spawn a team for independent tasks (use Agent View) or for a single fix (just do it). Teams are for *dependent, multi-file* work only.
+**Decompose to registered agents** (see *The Agents*): one teammate per independent stream, mapped
+to concrete paths, spawned as the agent that owns them. `pm` runs first and alone; `code-reviewer`
+and `pr-writer` are spawned at need, never standing lanes. State the cross-lane contract and flag
+dependencies before dependent work starts.
 
-**Lead role — oversee, do not code.**
-- The lead does NOT write or edit source files — not features, not integration glue, not `main.go`
-  wiring, not bug fixes. Every code change is assigned to an agent.
-- The lead's job: set the contract, decompose lanes, review diffs, make decisions, and VERIFY
-  (run builds/tests/servers, curl endpoints) — keystrokes on source belong to agents.
-- If a gap remains after agents finish, spawn/assign an agent to close it rather than editing directly.
+**The lead writes no source** — not features, not glue, not `main.go` wiring, not the last bug fix.
+It sets the contract, supervises, verifies, and gates; a gap left at the end gets an agent assigned.
 
-**Decomposition.**
-- Break the feature into one teammate per independent stream, plus a dedicated Review teammate.
-- Spawn the registered agent for the lane — `pm`, `backend`, `frontend`, `test-writer`,
-  `docs-writer`, `code-reviewer`, `pr-writer`. They already carry their own scope boundary, so don't
-  restate it in the brief. `general-purpose` is the fallback for a lane none of them covers.
-- Map every teammate to concrete files/modules. No vague lanes.
-- State the contract between streams (API shape, types) up front so teammates don't diverge.
+**Merging is a commit the lead makes.** Lanes share one tree, so a teammate's work is in the working
+files the moment it reports — nothing is withheld. A lane gates on **no new failures against a
+baseline recorded before any lane spawned** (not absolute green, or flaky and pre-existing failures
+burn fix cycles the crew never caused) plus a `code-reviewer` spawned fresh over that lane's diff —
+then `git add -- <that lane's paths>` and commit exactly those. **Never `-a`, never a bare
+`git commit`**: in a shared tree that sweeps a neighbour's half-finished work in and destroys the
+`git revert` boundary the gate exists for. A final fresh reviewer reads the combined diff.
 
-**Dependency discipline.**
-- Flag dependencies BEFORE dependent work starts (e.g. tests block on backend routes existing).
-- Coordinate through the shared task list; a teammate waiting on a dependency stays queued, not guessing.
+**Two fix cycles per finding**, keyed on normalised `file:line` + category so a reworded bug is not
+a new one. A third attempt is thrash: escalate.
 
-**Scope discipline (inherits the scope table above).**
-- Each teammate modifies only files in its lane (backend / frontend / tests / docs).
-- The Review teammate REPORTS issues with `file:line` — it never fixes them.
-- The lead merges a stream only after Review approves it.
+**Supervision is paced by teammate reports** — the lead has no clock and no idle loop. On each
+report, read the task list and ping, re-brief, or reassign whoever has gone quiet or out of lane.
 
-**Cost & safety.**
-- Teammates run on Opus (`CLAUDE_CODE_SUBAGENT_MODEL="claude-opus-5"`); the lead stays on the session model. Cap every unattended run — Opus lanes are not cheap.
-- Autonomous/headless runs must be capped: `--max-budget-usd N`.
-- The `permissions` deny list in settings.json is authoritative — never work around `git push --force`, `sudo`, or `publish` denials.
+**Cap every unattended run** (`--max-budget-usd N`). No subcommand reports spend, so the human reads
+it off `retinue watch`; when told the run is nearing the cap, stop spawning and drive open lanes to a
+gate.
